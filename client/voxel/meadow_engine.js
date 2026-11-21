@@ -47,6 +47,7 @@ import {
 } from "./vehicle_physics.js";
 
 import {
+  KUNLUN_PORTAL_POS,
   MAIN_PORTAL_POS,
   PALACE_TRIGRAM_MAP,
   TRIGRAMS,
@@ -64,6 +65,9 @@ export const ISLAND_SUPERELLIPSE_EXP = 3.1;
 export const BAGUA_ISLAND_CENTER_X = 498.24;
 export const BAGUA_ISLAND_CENTER_Z = 0;
 export const BAGUA_ISLAND_HALF_EXTENT = 240.24;
+export const KUNLUN_ISLAND_CENTER_X = 340;
+export const KUNLUN_ISLAND_CENTER_Z = -480;
+export const KUNLUN_ISLAND_RADIUS = 134;
 
 export function getIslandCoastWarp(theta) {
   return (
@@ -105,19 +109,42 @@ export function getBaguaIslandInlandMargin(x, z) {
   return BAGUA_ISLAND_HALF_EXTENT - octDist;
 }
 
+export function getKunlunIslandInlandMargin(x, z) {
+  const dx = x - KUNLUN_ISLAND_CENTER_X;
+  const dz = z - KUNLUN_ISLAND_CENTER_Z;
+  const dist = Math.hypot(dx, dz);
+  const theta = Math.atan2(dz, dx);
+  const warp = 7.4 * Math.cos(3 * theta + 0.8) + 4.8 * Math.sin(5 * theta - 0.5);
+  return KUNLUN_ISLAND_RADIUS + warp - dist;
+}
+
+export function getIslandKeyAt(x, z) {
+  const mMain = getMainIslandInlandMargin(x, z);
+  const mBagua = getBaguaIslandInlandMargin(x, z);
+  const mKunlun = getKunlunIslandInlandMargin(x, z);
+  if (mKunlun >= mMain && mKunlun >= mBagua) return "kunlun";
+  if (mBagua > mMain) return "bagua";
+  return "main";
+}
+
 /**
  * Signed distance (in meters) inward from the nearest flat buildable island plateau rim.
  * `> 0` is on the flat buildable island plateau (`y = 0`); `0` is the coastal crest;
  * `< 0` slopes down through sandy beaches & terraced coastal cliffs into the ocean.
  */
 export function getIslandInlandMargin(x, z) {
-  return Math.max(getMainIslandInlandMargin(x, z), getBaguaIslandInlandMargin(x, z));
+  return Math.max(
+    getMainIslandInlandMargin(x, z),
+    getBaguaIslandInlandMargin(x, z),
+    getKunlunIslandInlandMargin(x, z),
+  );
 }
 
 export function clampPointToIsland(x, z, minInlandMargin = 3.0) {
   if (getIslandInlandMargin(x, z) >= minInlandMargin) return [x, z];
-  const cx = x >= BAGUA_ISLAND_CENTER_X * 0.5 ? BAGUA_ISLAND_CENTER_X : 0;
-  const cz = x >= BAGUA_ISLAND_CENTER_X * 0.5 ? BAGUA_ISLAND_CENTER_Z : 0;
+  const key = getIslandKeyAt(x, z);
+  const cx = key === "kunlun" ? KUNLUN_ISLAND_CENTER_X : key === "bagua" ? BAGUA_ISLAND_CENTER_X : 0;
+  const cz = key === "kunlun" ? KUNLUN_ISLAND_CENTER_Z : key === "bagua" ? BAGUA_ISLAND_CENTER_Z : 0;
   const dx = x - cx;
   const dz = z - cz;
   const r = Math.hypot(dx, dz);
@@ -147,6 +174,9 @@ export function discoverFlightIslands(world, baguaPortals = []) {
   const baguaPortal = Array.isArray(baguaPortals)
     ? baguaPortals.find((p) => p.island === "bagua") || null
     : null;
+  const kunlunPortal = Array.isArray(baguaPortals)
+    ? baguaPortals.find((p) => p.island === "kunlun") || null
+    : null;
 
   const islands = [
     {
@@ -155,7 +185,9 @@ export function discoverFlightIslands(world, baguaPortals = []) {
       x: 0,
       z: 0,
       radius: 148,
-      portal: mainPortal ? { x: mainPortal.x, z: mainPortal.z, id: mainPortal.id } : { x: MAIN_PORTAL_POS[0], z: MAIN_PORTAL_POS[1], id: "main_to_bagua" },
+      portal: mainPortal
+        ? { x: mainPortal.x, z: mainPortal.z, id: mainPortal.id }
+        : { x: MAIN_PORTAL_POS[0], z: MAIN_PORTAL_POS[1], id: "main_to_bagua" },
     },
     {
       id: "bagua",
@@ -169,6 +201,16 @@ export function discoverFlightIslands(world, baguaPortals = []) {
             const [px, pz] = getBaguaPortalPos(BAGUA_ISLAND_CENTER_X, BAGUA_ISLAND_CENTER_Z);
             return { x: px, z: pz, id: "bagua_to_main" };
           })(),
+    },
+    {
+      id: "kunlun",
+      name: "蓬莱玄霜仙岛",
+      x: KUNLUN_ISLAND_CENTER_X,
+      z: KUNLUN_ISLAND_CENTER_Z,
+      radius: 122,
+      portal: kunlunPortal
+        ? { x: kunlunPortal.x, z: kunlunPortal.z, id: kunlunPortal.id }
+        : { x: KUNLUN_PORTAL_POS[0], z: KUNLUN_PORTAL_POS[1], id: "kunlun_to_main" },
     },
   ];
 
@@ -268,8 +310,9 @@ export function discoverFlightIslands(world, baguaPortals = []) {
 export function getIslandGroundHeight(x, z) {
   const m = getIslandInlandMargin(x, z);
   if (m >= 0) return 0;
-  const cx = x >= BAGUA_ISLAND_CENTER_X * 0.5 ? BAGUA_ISLAND_CENTER_X : 0;
-  const cz = x >= BAGUA_ISLAND_CENTER_X * 0.5 ? BAGUA_ISLAND_CENTER_Z : 0;
+  const key = getIslandKeyAt(x, z);
+  const cx = key === "kunlun" ? KUNLUN_ISLAND_CENTER_X : key === "bagua" ? BAGUA_ISLAND_CENTER_X : 0;
+  const cz = key === "kunlun" ? KUNLUN_ISLAND_CENTER_Z : key === "bagua" ? BAGUA_ISLAND_CENTER_Z : 0;
   const theta = Math.atan2(z - cz, x - cx);
   const cliff = getIslandCliffFactor(theta);
   const out = -m; // meters beyond plateau crest
@@ -1041,7 +1084,14 @@ const ISLAND_GLSL_HELPERS = `
     vec2 bd = abs(wp - vec2(498.24, 0.0));
     float octDist = max(max(bd.x, bd.y), (bd.x + bd.y) * 0.70710678);
     float baguaMargin = 240.24 - octDist;
-    return max(mainMargin, baguaMargin);
+
+    vec2 kd = wp - vec2(340.0, -480.0);
+    float kDist = length(kd);
+    float kTheta = kDist > 1e-4 ? atan(kd.y, kd.x) : 0.0;
+    float kWarp = 7.4 * cos(3.0 * kTheta + 0.8) + 4.8 * sin(5.0 * kTheta - 0.5);
+    float kunlunMargin = 134.0 + kWarp - kDist;
+
+    return max(max(mainMargin, baguaMargin), kunlunMargin);
   }
 `;
 
@@ -1182,7 +1232,7 @@ function buildEndlessGrassMaterial(uniforms) {
         }
 
         // East Bagua Island subtle voxel stone-meadow texture & grass-to-stone road shoulder transition
-        if (cellCenter.x >= 249.12) {
+        if (length(cellCenter - vec2(498.24, 0.0)) < 252.0) {
           vec2 bp = cellCenter - vec2(498.24, 0.0);
           vec2 bRot = vec2(
             abs(bp.x * 0.92387953 + bp.y * 0.38268343),
@@ -1231,15 +1281,22 @@ function buildEndlessGrassMaterial(uniforms) {
         }
 
         // Island Coastline Rim: voxel-stepped transition from meadow turf -> dune grass -> golden beach sand & rocky limestone bluffs
-        vec2 islandOrig = cellCenter.x >= 249.12 ? vec2(498.24, 0.0) : vec2(0.0, 0.0);
+        float dMainOrig = length(cellCenter);
+        float dBaguaOrig = length(cellCenter - vec2(498.24, 0.0));
+        float dKunlunOrig = length(cellCenter - vec2(340.0, -480.0));
+        vec2 islandOrig = dKunlunOrig < dMainOrig && dKunlunOrig < dBaguaOrig
+          ? vec2(340.0, -480.0)
+          : (dBaguaOrig < dMainOrig ? vec2(498.24, 0.0) : vec2(0.0, 0.0));
         vec2 relCoast = cellCenter - islandOrig;
         float coastTheta = length(relCoast) > 1e-4 ? atan(relCoast.y, relCoast.x) : 0.0;
         float cliffAmt = islandCliffFactor(coastTheta);
         float coastM = islandInlandMargin(cellCenter) + borderWarp * 0.38;
 
-        // Warm coastal dune grass right at the buildable island edge (margin 1.2m..5.6m)
+        // Warm coastal dune grass (or frosted tundra turf on Kunlun Isle) right at the buildable island edge
         float duneBlend = 1.0 - smoothstep(1.2, 5.6, coastM);
-        vec3 duneGrass = mix(srgb2lin(154.0, 196.0, 92.0), srgb2lin(192.0, 206.0, 116.0), subZone);
+        vec3 duneGrass = dKunlunOrig < 152.0
+          ? mix(srgb2lin(182.0, 214.0, 224.0), srgb2lin(226.0, 240.0, 248.0), subZone)
+          : mix(srgb2lin(154.0, 196.0, 92.0), srgb2lin(192.0, 206.0, 116.0), subZone);
         grassCol = mix(grassCol, duneGrass, duneBlend * 0.72);
 
         // Beyond the buildable crest (margin <= 1.8m): golden sandy beaches & layered coastal limestone cliffs
@@ -1286,7 +1343,7 @@ function buildEndlessGrassMaterial(uniforms) {
         }`,
       );
   };
-  mat.customProgramCacheKey = () => "geminisland-island-biomes-v16";
+  mat.customProgramCacheKey = () => "geminisland-island-biomes-v17";
   return mat;
 }
 
@@ -3582,7 +3639,9 @@ class CreationSimEntity {
     const baseSpeed = b.speed || 14.5;
     const baseAlt = b.altitude || 26.0;
 
-    roam.modeTimer -= dt;
+    if (roam.mode !== "summon_taiji") {
+      roam.modeTimer -= dt;
+    }
     roam.portalCooldown = Math.max(0, roam.portalCooldown - dt);
     roam.glideCycle += dt;
 
@@ -3601,7 +3660,20 @@ class CreationSimEntity {
     let desiredSpeed = baseSpeed;
     let steerRate = 2.15;
 
-    if (roam.mode === "orbit") {
+    if (roam.mode === "summon_taiji") {
+      roam.summonTimer = Math.max(0, (roam.summonTimer || 0) - dt);
+      roam.orbitAng += dt * 0.72;
+      const rad = 36 + Math.sin(t * 1.3) * 6;
+      targetX = BAGUA_ISLAND_CENTER_X + Math.cos(roam.orbitAng) * rad;
+      targetZ = BAGUA_ISLAND_CENTER_Z + Math.sin(roam.orbitAng) * rad;
+      targetY = 23.5 + Math.sin(t * 2.1) * 3.8;
+      desiredSpeed = baseSpeed * 1.18;
+      steerRate = 3.2;
+      if (roam.summonTimer <= 0) {
+        roam.mode = "orbit";
+        roam.modeTimer = 11 + Math.random() * 6;
+      }
+    } else if (roam.mode === "orbit") {
       roam.orbitAng += roam.orbitDir * dt * (baseSpeed / Math.max(55, curIsland.radius * 0.74));
       const weave = 0.48 + 0.34 * Math.sin(roam.orbitAng * 1.65 + roam.altPhase);
       const rad = curIsland.radius * weave;
@@ -4130,6 +4202,19 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
   groundMeshBagua.updateMatrix();
   scene.add(groundMeshBagua);
 
+  const groundGeoKunlun = buildIslandTerrainGeometry(
+    KUNLUN_ISLAND_CENTER_X,
+    KUNLUN_ISLAND_CENTER_Z,
+    380,
+    192,
+    24,
+  );
+  const groundMeshKunlun = new THREE.Mesh(groundGeoKunlun, groundMat);
+  groundMeshKunlun.receiveShadow = true;
+  groundMeshKunlun.matrixAutoUpdate = false;
+  groundMeshKunlun.updateMatrix();
+  scene.add(groundMeshKunlun);
+
   // Pure Circular Center Taiji Plaza & Stone Border Rings at Bagua Heart (498.24, 0)
   const taijiPlazaGroup = new THREE.Group();
   taijiPlazaGroup.position.set(BAGUA_ISLAND_CENTER_X, 0, BAGUA_ISLAND_CENTER_Z);
@@ -4299,6 +4384,50 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       z: rz,
       rotY: (k * 2.05) % (Math.PI * 2),
       scale: 0.88 + (k % 4) * 0.16,
+      isTree: false,
+      isCoastalRock: true,
+      blocked: false,
+    });
+  }
+  // North Kunlun Frost-Jade Isle alpine groves & rocky cliff boulders
+  for (let i = 0; i < 24; i++) {
+    const r = 56 + ((i * 13) % 62);
+    const ang = i * 2.399963 + 1.1;
+    const tx = KUNLUN_ISLAND_CENTER_X + Math.cos(ang) * r;
+    const tz = KUNLUN_ISLAND_CENTER_Z + Math.sin(ang) * r;
+    if (
+      getKunlunIslandInlandMargin(tx, tz) >= 6.8 &&
+      Math.hypot(tx - KUNLUN_PORTAL_POS[0], tz - KUNLUN_PORTAL_POS[1]) > 14
+    ) {
+      perimeterScenery.push({
+        mesh: treeProtos[(i + 2) % 3],
+        x: tx,
+        y: 0,
+        z: tz,
+        rotY: (i * 1.45) % (Math.PI * 2),
+        scale: 0.86 + (i % 3) * 0.14,
+        isTree: true,
+        isCoastalRock: false,
+        blocked: false,
+      });
+    }
+  }
+  for (let k = 0; k < 18; k++) {
+    const ang = (k / 18) * Math.PI * 2 + 0.12;
+    const shoreMargin = -3.1 + (k % 3) * 0.85;
+    const [rx, rz] = clampPointToIsland(
+      KUNLUN_ISLAND_CENTER_X + Math.cos(ang) * 210,
+      KUNLUN_ISLAND_CENTER_Z + Math.sin(ang) * 210,
+      shoreMargin,
+    );
+    const ry = getIslandGroundHeight(rx, rz) - 0.12;
+    perimeterScenery.push({
+      mesh: rockProtos[(k + 2) % 3],
+      x: rx,
+      y: ry,
+      z: rz,
+      rotY: (k * 1.92) % (Math.PI * 2),
+      scale: 0.92 + (k % 3) * 0.18,
       isTree: false,
       isCoastalRock: true,
       blocked: false,
@@ -4572,7 +4701,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
   let MIN_CAM_X = -195;
   let MAX_CAM_X = 790;
-  let MIN_CAM_Z = -280;
+  let MIN_CAM_Z = -680;
   let MAX_CAM_Z = 280;
   function clampTarget() {
     cam.goalTx = Math.max(MIN_CAM_X, Math.min(MAX_CAM_X, cam.goalTx));
@@ -4584,6 +4713,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     if (getIslandInlandMargin(x, z) < rNew + 2.2) return false;
     if (Math.hypot(x - CITY_SIGN_POS[0], z - CITY_SIGN_POS[1]) < rNew + 2.2) return false;
     if (Math.hypot(x - MAIN_PORTAL_POS[0], z - MAIN_PORTAL_POS[1]) < rNew + 3.4) return false;
+    if (Math.hypot(x - KUNLUN_PORTAL_POS[0], z - KUNLUN_PORTAL_POS[1]) < rNew + 3.4) return false;
     const [bpX, bpZ] = getBaguaPortalPos(BAGUA_ISLAND_CENTER_X, BAGUA_ISLAND_CENTER_Z);
     if (Math.hypot(x - bpX, z - bpZ) < rNew + 3.4) return false;
     if (!currentWorld) return true;
@@ -4620,8 +4750,10 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     if (isClientSpotClear(cx, cz, candidateRadius)) {
       return [Number(cx.toFixed(1)), Number(cz.toFixed(1))];
     }
-    const islandCx = cx >= BAGUA_ISLAND_CENTER_X * 0.5 ? BAGUA_ISLAND_CENTER_X : 0;
-    const baseAng = Math.atan2(cz, cx - islandCx);
+    const iKey = getIslandKeyAt(cx, cz);
+    const islandCx = iKey === "kunlun" ? KUNLUN_ISLAND_CENTER_X : iKey === "bagua" ? BAGUA_ISLAND_CENTER_X : 0;
+    const islandCz = iKey === "kunlun" ? KUNLUN_ISLAND_CENTER_Z : iKey === "bagua" ? BAGUA_ISLAND_CENTER_Z : 0;
+    const baseAng = Math.atan2(cz - islandCz, cx - islandCx);
     for (let r = 2.5; r <= 78; r += 2.6) {
       for (let k = 0; k < 20; k++) {
         const ang = baseAng + (k / 20) * Math.PI * 2;
@@ -5505,7 +5637,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     if (refreshedIslands.length > 0) {
       MIN_CAM_X = Math.min(-195, ...refreshedIslands.map((isl) => isl.x - isl.radius - 60));
       MAX_CAM_X = Math.max(790, ...refreshedIslands.map((isl) => isl.x + isl.radius + 60));
-      MIN_CAM_Z = Math.min(-280, ...refreshedIslands.map((isl) => isl.z - isl.radius - 60));
+      MIN_CAM_Z = Math.min(-680, ...refreshedIslands.map((isl) => isl.z - isl.radius - 60));
       MAX_CAM_Z = Math.max(280, ...refreshedIslands.map((isl) => isl.z + isl.radius + 60));
     }
 
@@ -5917,6 +6049,19 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         continue;
       }
       if (ent.data.category === "building" || ent.data.behavior?.type === "landmark") {
+        if (typeof ent.id === "string" && ent.id.startsWith("bagua-gate-")) {
+          const gYaw = ent.yaw || 0;
+          const cosY = Math.cos(gYaw);
+          const sinY = Math.sin(gYaw);
+          for (const sideSign of [-1, 1]) {
+            const px = ent.x + cosY * (sideSign * 2.22);
+            const pz = ent.z - sinY * (sideSign * 2.22);
+            if (pushPointOutOfVehicleOBB(x, z, 0.34 + extraMargin, px, pz, gYaw, 0.62, 0.75)) {
+              return false;
+            }
+          }
+          continue;
+        }
         const box = getBuildingTightBox(ent, 0.8);
         const pushed = pushPointOutOfVehicleOBB(
           x,
@@ -5966,6 +6111,21 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         if (isSkateHalfpipeEntity(ent)) {
           [x, z] = resolveHalfpipeCollision(ent, x, z, curFeetY);
         } else if (ent.data.category === "building" || ent.data.behavior?.type === "landmark") {
+          if (typeof ent.id === "string" && ent.id.startsWith("bagua-gate-")) {
+            const gYaw = ent.yaw || 0;
+            const cosY = Math.cos(gYaw);
+            const sinY = Math.sin(gYaw);
+            for (const sideSign of [-1, 1]) {
+              const px = ent.x + cosY * (sideSign * 2.22);
+              const pz = ent.z - sinY * (sideSign * 2.22);
+              const pushedPillar = pushPointOutOfVehicleOBB(x, z, 0.34, px, pz, gYaw, 0.62, 0.75);
+              if (pushedPillar) {
+                x = pushedPillar[0];
+                z = pushedPillar[1];
+              }
+            }
+            continue;
+          }
           const box = getBuildingTightBox(ent, 0.8);
           const pushedBld = pushPointOutOfVehicleOBB(
             x,
@@ -6061,7 +6221,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         });
       }
     },
-    onPalaceActivated({ trigram, palaceName, activatedCount, isComplete, fromRemote }) {
+    onPalaceActivated({ trigram, palaceName, activatedCount, isComplete, synergyChain, generatedFromName, fromRemote }) {
       const triIdx = TRIGRAMS.indexOf(trigram);
       if (!fromRemote) {
         callbacks.onLocalBaguaPulse?.({
@@ -6072,13 +6232,30 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         });
         const msg = isComplete
           ? `八宫共鸣圆融（8/8）· ${trigram.symbol} ${palaceName} 灵柱升腾！`
-          : `已点亮 ${trigram.symbol} ${palaceName} 星阵（${activatedCount}/8）`;
+          : synergyChain >= 2 && generatedFromName
+            ? `五行相生共鸣 ×${synergyChain}！${generatedFromName} ➔ ${trigram.symbol} ${palaceName}（${activatedCount}/8）`
+            : `已点亮 ${trigram.symbol} ${palaceName} 星阵（${activatedCount}/8）`;
         callbacks.onInteractiveEvent?.(null, msg);
       }
     },
     onGrandResonance({ fromRemote }) {
+      const dapeng = creationEntities.get("world-dapeng-roc");
+      if (dapeng?.islandRoam) {
+        const islands = Array.isArray(simCtx?.islands) ? simCtx.islands : [];
+        const baguaIdx = islands.findIndex((i) => i.id === "bagua");
+        if (baguaIdx >= 0) dapeng.islandRoam.targetIslandIdx = baguaIdx;
+        dapeng.islandRoam.mode = "summon_taiji";
+        dapeng.islandRoam.summonTimer = 14.0;
+        dapeng.islandRoam.orbitAng = Math.atan2(
+          dapeng.z - BAGUA_ISLAND_CENTER_Z,
+          dapeng.x - BAGUA_ISLAND_CENTER_X,
+        );
+      }
       if (!fromRemote) {
-        callbacks.onInteractiveEvent?.(null, "太极冲霄！八卦八宫全面共鸣 · 灵脉光柱直贯苍穹");
+        callbacks.onInteractiveEvent?.(
+          null,
+          "太极冲霄！八卦八宫全面共鸣 · 扶摇大鹏降临太极坛盘旋朝贺！",
+        );
       }
     },
     onTeleportSwap({ destX, destZ, destIsland, destYaw, portal }) {
@@ -6110,7 +6287,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         cam.tz = cam.goalTz = destZ;
         cam.ty = cam.goalTy = 0;
         if (cam.goalZoom < 0.55) {
-          cam.zoom = cam.goalZoom = destIsland === "bagua" ? 0.72 : getHomeZoom();
+          cam.zoom = cam.goalZoom = destIsland === "bagua" ? 0.72 : destIsland === "kunlun" ? 0.68 : getHomeZoom();
         }
         if (dragMode === "panorama") {
           dragMode = "pan";
@@ -6127,7 +6304,9 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       const msg =
         portal.destIsland === "bagua"
           ? "折叠空间跃迁完成 · 已抵达八卦城太极坛"
-          : "折叠空间跃迁完成 · 已返回主岛中央广场";
+          : portal.destIsland === "kunlun"
+            ? "折叠空间跃迁完成 · 已抵达蓬莱玄霜仙岛"
+            : "折叠空间跃迁完成 · 已返回主岛中央广场";
       callbacks.onInteractiveEvent?.(null, msg);
     },
   });
@@ -6151,7 +6330,14 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
   function applyRemoteBaguaTeleport(msg) {
     if (!baguaMystic || !msg || typeof msg !== "object") return;
-    const trigIdx = msg.portalId === "main_to_bagua" ? 4 : 0;
+    const trigIdx =
+      msg.portalId === "main_to_bagua"
+        ? 4
+        : msg.portalId === "bagua_to_kunlun"
+          ? 6
+          : msg.portalId === "kunlun_to_main"
+            ? 5
+            : 0;
     baguaMystic.triggerAltarPulse(trigIdx, 1.25, false, { fromRemote: true });
   }
 
@@ -7004,6 +7190,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
   function flyToIsland(targetIsland = "main") {
     const isBagua = targetIsland === "bagua";
+    const isKunlun = targetIsland === "kunlun";
     cancelIntroSweep();
     if (interiorSystem.isInside()) {
       exitCurrentBuilding();
@@ -7017,6 +7204,8 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     if (fp.active) {
       if (isBagua) {
         placeFirstPersonNear(BAGUA_ISLAND_CENTER_X, BAGUA_ISLAND_CENTER_Z, -Math.PI * 0.5, 28);
+      } else if (isKunlun) {
+        placeFirstPersonNear(KUNLUN_ISLAND_CENTER_X, KUNLUN_ISLAND_CENTER_Z + 18, Math.PI, 4.0);
       } else {
         placeFirstPersonNear(10.6, -0.6, initialSpawnYaw, 1.0);
       }
@@ -7028,10 +7217,14 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       callbacks.onDragModeChange?.("pan");
     }
     cam.az = HOME_AZ + wrapPi(cam.az - HOME_AZ);
-    cam.goalTx = isBagua ? BAGUA_ISLAND_CENTER_X : HOME_TX;
+    cam.goalTx = isKunlun ? KUNLUN_ISLAND_CENTER_X : isBagua ? BAGUA_ISLAND_CENTER_X : HOME_TX;
     cam.goalTy = 0;
-    cam.goalTz = isBagua ? BAGUA_ISLAND_CENTER_Z : HOME_TZ;
-    cam.goalZoom = isBagua ? Math.min(0.56, getHomeZoom() * 0.54) : getHomeZoom();
+    cam.goalTz = isKunlun ? KUNLUN_ISLAND_CENTER_Z : isBagua ? BAGUA_ISLAND_CENTER_Z : HOME_TZ;
+    cam.goalZoom = isKunlun
+      ? Math.min(0.62, getHomeZoom() * 0.62)
+      : isBagua
+        ? Math.min(0.56, getHomeZoom() * 0.54)
+        : getHomeZoom();
     cam.goalAz = HOME_AZ;
     cam.goalEl = HOME_EL;
     clampTarget();
@@ -8016,7 +8209,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
     const reportFpCameraChange = (txVal, tzVal) => {
       const azDeltaFromHome = wrapPi(fp.yaw - HOME_AZ);
-      const curIsland = txVal >= BAGUA_ISLAND_CENTER_X * 0.5 ? "bagua" : "main";
+      const curIsland = getIslandKeyAt(txVal, tzVal);
       if (
         callbacks.onCameraChange &&
         (Number.isNaN(lastReportedAz) ||
@@ -8668,7 +8861,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
           Math.abs(cam.zoom - getHomeZoom()) < 0.04 &&
           Math.hypot(cam.tx - HOME_TX, cam.tz - HOME_TZ) < 1.2;
 
-        const curIsland = cam.tx >= BAGUA_ISLAND_CENTER_X * 0.5 ? "bagua" : "main";
+        const curIsland = getIslandKeyAt(cam.tx, cam.tz);
         if (
           callbacks.onCameraChange &&
           (Number.isNaN(lastReportedAz) ||
@@ -8784,6 +8977,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         activeCamera: activeCam,
         spaceFoldOverlayEl,
         ogMode,
+        duskMix: ogMode ? 0 : duskMix,
       });
       if (fp.active && !introSweep.usingFpCam) {
         const foldState = baguaMystic.getFoldState();
@@ -8860,9 +9054,10 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     getBaguaTelemetry: () => {
       if (!baguaMystic) return null;
       const vx = fp.active ? fp.x : cam.tx;
+      const vz = fp.active ? fp.z : cam.tz;
       return {
         ...baguaMystic.getTelemetry(),
-        onBaguaIsland: vx >= BAGUA_ISLAND_CENTER_X * 0.5 && !interiorSystem.isInside(),
+        onBaguaIsland: getIslandKeyAt(vx, vz) === "bagua" && !interiorSystem.isInside(),
       };
     },
     projectWorldToScreen: (wx = BAGUA_ISLAND_CENTER_X, wy = 15, wz = BAGUA_ISLAND_CENTER_Z) => {

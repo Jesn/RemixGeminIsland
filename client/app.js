@@ -45,6 +45,7 @@ const weaveToast = document.getElementById("weave-toast");
 
 const islandMainBtn = document.getElementById("island-main-btn");
 const islandBaguaBtn = document.getElementById("island-bagua-btn");
+const islandKunlunBtn = document.getElementById("island-kunlun-btn");
 const camPanBtn = document.getElementById("cam-pan-btn");
 const camOrbitBtn = document.getElementById("cam-orbit-btn");
 const camWalkBtn = document.getElementById("cam-walk-btn");
@@ -231,13 +232,19 @@ function syncWalkJoystickVisibility() {
 
 function syncIslandSwitchUI(island) {
   const isBagua = island === "bagua";
+  const isKunlun = island === "kunlun";
+  const isMain = !isBagua && !isKunlun;
   if (islandMainBtn) {
-    islandMainBtn.classList.toggle("is-active", !isBagua);
-    islandMainBtn.setAttribute("aria-pressed", !isBagua ? "true" : "false");
+    islandMainBtn.classList.toggle("is-active", isMain);
+    islandMainBtn.setAttribute("aria-pressed", isMain ? "true" : "false");
   }
   if (islandBaguaBtn) {
     islandBaguaBtn.classList.toggle("is-active", isBagua);
     islandBaguaBtn.setAttribute("aria-pressed", isBagua ? "true" : "false");
+  }
+  if (islandKunlunBtn) {
+    islandKunlunBtn.classList.toggle("is-active", isKunlun);
+    islandKunlunBtn.setAttribute("aria-pressed", isKunlun ? "true" : "false");
   }
 }
 
@@ -390,7 +397,11 @@ engine = createMeadowWorldEngine(
         const deg = ((camState.azDeltaFromHome * 180) / Math.PI).toFixed(1);
         recenterCompass.setAttribute("transform", `rotate(${deg} 12 12)`);
       }
-      if (camState?.island === "bagua" || camState?.island === "main") {
+      if (
+        camState?.island === "bagua" ||
+        camState?.island === "kunlun" ||
+        camState?.island === "main"
+      ) {
         syncIslandSwitchUI(camState.island);
       }
     },
@@ -510,6 +521,13 @@ islandBaguaBtn?.addEventListener("click", () => {
   syncIslandSwitchUI("bagua");
   engine.flyToIsland("bagua");
   islandBaguaBtn.blur();
+});
+
+islandKunlunBtn?.addEventListener("click", () => {
+  hoverCard.hidden = true;
+  syncIslandSwitchUI("kunlun");
+  engine.flyToIsland("kunlun");
+  islandKunlunBtn.blur();
 });
 
 camPanBtn?.addEventListener("click", () => {

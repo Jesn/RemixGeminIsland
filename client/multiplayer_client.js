@@ -814,7 +814,14 @@ export function createMultiplayerClient(options = {}) {
 
   function sendBaguaTeleport(portalId) {
     if (!multiplayerEnabled || disposed) return;
-    if (portalId !== "main_to_bagua" && portalId !== "bagua_to_main") return;
+    if (
+      portalId !== "main_to_bagua" &&
+      portalId !== "bagua_to_main" &&
+      portalId !== "bagua_to_kunlun" &&
+      portalId !== "kunlun_to_main"
+    ) {
+      return;
+    }
     safeSendJson({ t: "bagua_teleport", portalId });
   }
 

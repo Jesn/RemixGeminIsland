@@ -595,7 +595,12 @@ export class MultiplayerHub {
     }
 
     if (t === "bagua_teleport") {
-      if (rawEvent.portalId !== "main_to_bagua" && rawEvent.portalId !== "bagua_to_main") {
+      if (
+        rawEvent.portalId !== "main_to_bagua" &&
+        rawEvent.portalId !== "bagua_to_main" &&
+        rawEvent.portalId !== "bagua_to_kunlun" &&
+        rawEvent.portalId !== "kunlun_to_main"
+      ) {
         return;
       }
       if (now - session.lastEmoteMs < 350) return;

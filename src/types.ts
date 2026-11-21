@@ -385,7 +385,7 @@ export type MultiplayerClientMessage =
     }
   | {
       t: "bagua_teleport";
-      portalId: "main_to_bagua" | "bagua_to_main";
+      portalId: "main_to_bagua" | "bagua_to_main" | "bagua_to_kunlun" | "kunlun_to_main";
     };
 
 export type MultiplayerServerMessage =
@@ -426,7 +426,7 @@ export type MultiplayerServerMessage =
   | {
       type: "mp_bagua_teleport";
       id: string;
-      portalId: "main_to_bagua" | "bagua_to_main";
+      portalId: "main_to_bagua" | "bagua_to_main" | "bagua_to_kunlun" | "kunlun_to_main";
     }
   | {
       type: "mp_leave";

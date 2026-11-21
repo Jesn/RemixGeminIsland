@@ -112,6 +112,11 @@ body {
   color: var(--white);
 }
 
+.island-switch-group #island-kunlun-btn.is-active {
+  background: #226f82;
+  color: var(--white);
+}
+
 #cam-panorama-btn.is-active {
   background: linear-gradient(135deg, #1b4d46 0%, #246f68 100%);
   color: var(--white);

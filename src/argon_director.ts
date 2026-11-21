@@ -44,6 +44,7 @@ import {
   snapAngleToSimCityGrid,
 } from "./town_planner";
 import { BAGUA_ISLAND_CENTER, BAGUA_PROTECTED_PATH_IDS } from "./bagua_island";
+import { KUNLUN_PROTECTED_PATH_IDS } from "./kunlun_island";
 import type { CompanionVehicleArchetype } from "./world_landmarks_v16";
 
 export const CITY_SIGN_POS: [number, number] = [3.8, -10.8];
@@ -1356,6 +1357,7 @@ export function sanitizeWorldPatch(
     "path-bookshop-spur",
     "path-green-walk",
     ...BAGUA_PROTECTED_PATH_IDS,
+    ...KUNLUN_PROTECTED_PATH_IDS,
   ]);
   const existingPathIds = new Set(world.paths.map((p) => p.id));
   const removePathIds: string[] = [];

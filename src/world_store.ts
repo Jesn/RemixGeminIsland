@@ -80,6 +80,7 @@ import {
 } from "./voxel_dsl";
 import { applyCuratedDistrictRelocations } from "./curated_district_relocations";
 import { BAGUA_PROTECTED_PATH_IDS, ensureBaguaIsland } from "./bagua_island";
+import { ensureKunlunIsland, KUNLUN_PROTECTED_PATH_IDS } from "./kunlun_island";
 import { buildCompanionVehicleBlueprint } from "./world_landmarks_v16";
 
 const MAX_CONCURRENT_SCULPTS = 3;
@@ -350,7 +351,7 @@ export class WorldStore {
           for (const dc of disk.creations) {
             if (dc && typeof dc.id === "string") {
               byId.set(dc.id, dc);
-              if (diskAudited && !dc.id.startsWith("bagua-")) {
+              if (diskAudited && !dc.id.startsWith("bagua-") && !dc.id.startsWith("kunlun-")) {
                 bundledBlueprintIds.add(dc.id);
               } else {
                 bundledBlueprintIds.delete(dc.id);
@@ -404,6 +405,14 @@ export class WorldStore {
       villagers: this.villagers,
     }).changed;
 
+    const kunlunChanged = ensureKunlunIsland({
+      creations: this.creations,
+      paths: this.paths,
+      props: this.props,
+      terrainZones: this.terrainZones,
+      villagers: this.villagers,
+    }).changed;
+
     // Enforce island content & brand/political neutrality policy on loaded world state
     const policyFiltered = filterWorldCollectionsByPolicy({
       creations: this.creations,
@@ -450,7 +459,7 @@ export class WorldStore {
       bgTimer.unref?.();
     }
 
-    if (curatedChanged || baguaChanged) {
+    if (curatedChanged || baguaChanged || kunlunChanged) {
       this.version += 1;
       this.schedulePersist();
     }
@@ -1706,6 +1715,7 @@ export class WorldStore {
         "path-bookshop-spur",
         "path-green-walk",
         ...BAGUA_PROTECTED_PATH_IDS,
+        ...KUNLUN_PROTECTED_PATH_IDS,
       ]);
       const delSet = new Set(patch.removePathIds.filter((id) => !protectedSeed.has(id)));
       this.paths = this.paths.filter((p) => !delSet.has(p.id));
@@ -1726,8 +1736,18 @@ export class WorldStore {
       }
       const merged = [...byId.values()];
       if (merged.length > 48) {
-        const seeds = merged.filter((z) => z.id.startsWith("zone-seed-") || z.id.startsWith("zone-bagua-"));
-        const nonSeeds = merged.filter((z) => !z.id.startsWith("zone-seed-") && !z.id.startsWith("zone-bagua-"));
+        const seeds = merged.filter(
+          (z) =>
+            z.id.startsWith("zone-seed-") ||
+            z.id.startsWith("zone-bagua-") ||
+            z.id.startsWith("zone-kunlun-"),
+        );
+        const nonSeeds = merged.filter(
+          (z) =>
+            !z.id.startsWith("zone-seed-") &&
+            !z.id.startsWith("zone-bagua-") &&
+            !z.id.startsWith("zone-kunlun-"),
+        );
         this.terrainZones = [...seeds, ...nonSeeds.slice(-(48 - seeds.length))].slice(0, 48);
       } else {
         this.terrainZones = merged;

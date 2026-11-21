@@ -9,7 +9,7 @@ export function createBaguaD3Hud(containerEl) {
     };
   }
 
-  let collapsed = false;
+  let collapsed = true;
   const WAVE_LEN = 42;
   const waveHistory = new Array(WAVE_LEN).fill(0.5);
   let lastWavePush = 0;
@@ -38,7 +38,8 @@ export function createBaguaD3Hud(containerEl) {
   toggleBtn.type = "button";
   toggleBtn.className = "bagua-hud-toggle";
   toggleBtn.setAttribute("aria-label", "折叠或展开八卦灵脉面板");
-  toggleBtn.textContent = "−";
+  toggleBtn.setAttribute("aria-expanded", "false");
+  toggleBtn.textContent = "+";
   controlsWrap.append(hzEl, toggleBtn);
   headerEl.append(titleWrap, controlsWrap);
 
@@ -66,6 +67,7 @@ export function createBaguaD3Hud(containerEl) {
   waveWrap.appendChild(waveMeta);
   bodyEl.append(radarWrap, waveWrap);
   containerEl.append(headerEl, bodyEl);
+  containerEl.classList.add("is-collapsed");
   headerEl.title = "拖动可自由移动位置 · 双击复位";
 
   let currentX = 14;
@@ -125,6 +127,7 @@ export function createBaguaD3Hud(containerEl) {
     collapsed = !collapsed;
     containerEl.classList.toggle("is-collapsed", collapsed);
     toggleBtn.textContent = collapsed ? "+" : "−";
+    toggleBtn.setAttribute("aria-expanded", String(!collapsed));
     if (customPos) {
       customPos = clampPos(customPos.x, customPos.y, 10);
       applyTransform(customPos.x, customPos.y);
@@ -412,6 +415,7 @@ export function createBaguaD3Hud(containerEl) {
       collapsed = Boolean(next);
       containerEl.classList.toggle("is-collapsed", collapsed);
       toggleBtn.textContent = collapsed ? "+" : "−";
+      toggleBtn.setAttribute("aria-expanded", String(!collapsed));
     },
     destroy() {
       containerEl.innerHTML = "";

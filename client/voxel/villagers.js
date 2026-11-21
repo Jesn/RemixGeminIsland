@@ -12,6 +12,9 @@ const ISLAND_SUPERELLIPSE_EXP = 3.1;
 const BAGUA_ISLAND_CENTER_X = 498.24;
 const BAGUA_ISLAND_CENTER_Z = 0;
 const BAGUA_ISLAND_HALF_EXTENT = 240.24;
+const KUNLUN_ISLAND_CENTER_X = 340;
+const KUNLUN_ISLAND_CENTER_Z = -480;
+const KUNLUN_ISLAND_RADIUS = 134;
 
 function getMainIslandInlandMargin(x, z) {
   const ax = Math.abs(x) / ISLAND_HALF_EXTENT;
@@ -38,14 +41,37 @@ function getBaguaIslandInlandMargin(x, z) {
   return BAGUA_ISLAND_HALF_EXTENT - octDist;
 }
 
+function getKunlunIslandInlandMargin(x, z) {
+  const dx = x - KUNLUN_ISLAND_CENTER_X;
+  const dz = z - KUNLUN_ISLAND_CENTER_Z;
+  const dist = Math.hypot(dx, dz);
+  const theta = Math.atan2(dz, dx);
+  const warp = 7.4 * Math.cos(3 * theta + 0.8) + 4.8 * Math.sin(5 * theta - 0.5);
+  return KUNLUN_ISLAND_RADIUS + warp - dist;
+}
+
 function getIslandInlandMargin(x, z) {
-  return Math.max(getMainIslandInlandMargin(x, z), getBaguaIslandInlandMargin(x, z));
+  return Math.max(
+    getMainIslandInlandMargin(x, z),
+    getBaguaIslandInlandMargin(x, z),
+    getKunlunIslandInlandMargin(x, z),
+  );
 }
 
 function clampVillagerToIsland(x, z, minMargin = 2.0) {
   if (getIslandInlandMargin(x, z) >= minMargin) return [x, z];
-  const cx = x >= BAGUA_ISLAND_CENTER_X * 0.5 ? BAGUA_ISLAND_CENTER_X : 0;
-  const cz = x >= BAGUA_ISLAND_CENTER_X * 0.5 ? BAGUA_ISLAND_CENTER_Z : 0;
+  const mMain = getMainIslandInlandMargin(x, z);
+  const mBagua = getBaguaIslandInlandMargin(x, z);
+  const mKunlun = getKunlunIslandInlandMargin(x, z);
+  let cx = 0;
+  let cz = 0;
+  if (mKunlun >= mMain && mKunlun >= mBagua) {
+    cx = KUNLUN_ISLAND_CENTER_X;
+    cz = KUNLUN_ISLAND_CENTER_Z;
+  } else if (mBagua > mMain) {
+    cx = BAGUA_ISLAND_CENTER_X;
+    cz = BAGUA_ISLAND_CENTER_Z;
+  }
   const dx = x - cx;
   const dz = z - cz;
   const r = Math.hypot(dx, dz);

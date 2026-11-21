@@ -52,6 +52,7 @@ function rotateClosedWaypointsNear(
 }
 
 import { BAGUA_ISLAND_CENTER, getBaguaIslandInlandMargin } from "./bagua_island";
+import { KUNLUN_ISLAND_CENTER, getKunlunIslandInlandMargin } from "./kunlun_island";
 
 export const ISLAND_HALF_EXTENT = 163.5;
 export const ISLAND_SUPERELLIPSE_EXP = 3.1;
@@ -80,29 +81,45 @@ export function getMainIslandInlandMargin(x: number, z: number): number {
 
 /**
  * Signed distance (in meters) inward from the nearest flat buildable island plateau rim
- * (either Main GeminIsland at [0,0] or East Bagua Island at [418,0]).
+ * across Main GeminIsland [0,0], East Bagua Island [498.24,0], or North Kunlun Frost Isle [340,-480].
  */
 export function getIslandInlandMargin(x: number, z: number): number {
-  return Math.max(getMainIslandInlandMargin(x, z), getBaguaIslandInlandMargin(x, z));
+  return Math.max(
+    getMainIslandInlandMargin(x, z),
+    getBaguaIslandInlandMargin(x, z),
+    getKunlunIslandInlandMargin(x, z),
+  );
+}
+
+function pickNearestIslandMeta(x: number, z: number): {
+  center: [number, number];
+  marginFn: (px: number, pz: number) => number;
+  key: "main" | "bagua" | "kunlun";
+} {
+  const mMain = getMainIslandInlandMargin(x, z);
+  const mBagua = getBaguaIslandInlandMargin(x, z);
+  const mKunlun = getKunlunIslandInlandMargin(x, z);
+  if (mKunlun >= mMain && mKunlun >= mBagua) {
+    return { center: KUNLUN_ISLAND_CENTER, marginFn: getKunlunIslandInlandMargin, key: "kunlun" };
+  }
+  if (mBagua > mMain) {
+    return { center: BAGUA_ISLAND_CENTER, marginFn: getBaguaIslandInlandMargin, key: "bagua" };
+  }
+  return { center: [0, 0], marginFn: getMainIslandInlandMargin, key: "main" };
 }
 
 export function getNearestIslandCenter(x: number, z: number): [number, number] {
-  return getBaguaIslandInlandMargin(x, z) > getMainIslandInlandMargin(x, z)
-    ? BAGUA_ISLAND_CENTER
-    : [0, 0];
+  return pickNearestIslandMeta(x, z).center;
 }
 
 export function clampPointToIsland(x: number, z: number, minInlandMargin = 3.0): [number, number] {
   if (getIslandInlandMargin(x, z) >= minInlandMargin) return [x, z];
-  const [cx, cz] =
-    x >= 209 || getBaguaIslandInlandMargin(x, z) > getMainIslandInlandMargin(x, z)
-      ? BAGUA_ISLAND_CENTER
-      : [0, 0];
+  const { center, marginFn } = pickNearestIslandMeta(x, z);
+  const [cx, cz] = center;
   const dx = x - cx;
   const dz = z - cz;
   const r = Math.hypot(dx, dz);
   if (r < 0.001) return [cx, cz];
-  const marginFn = cx === 0 ? getMainIslandInlandMargin : getBaguaIslandInlandMargin;
   let lo = 0;
   let hi = 1;
   for (let i = 0; i < 14; i++) {
@@ -282,7 +299,10 @@ export function chooseSimCityPlot(opts: {
     Number.isFinite(reqZ)
   ) {
     const [cx, cz] = clampPointToIsland(reqX, reqZ, newRadius + 2.8);
-    const reqOnBagua = reqX >= 209;
+    const reqIsland = pickNearestIslandMeta(reqX, reqZ).key;
+    const matchesRequestedIsland = (px: number, pz: number): boolean =>
+      pickNearestIslandMeta(px, pz).key === reqIsland &&
+      getIslandInlandMargin(px, pz) >= newRadius + 2.4;
     if (isSpotClear(cx, cz)) {
       return [Number(cx.toFixed(1)), Number(cz.toFixed(1))];
     }
@@ -292,8 +312,8 @@ export function chooseSimCityPlot(opts: {
         const ang = (k / 16) * Math.PI * 2;
         const tx = Number((cx + Math.cos(ang) * rad).toFixed(1));
         const tz = Number((cz + Math.sin(ang) * rad).toFixed(1));
-        if (reqOnBagua ? tx >= 245 : tx <= 170) {
-          if (isSpotClear(tx, tz)) return [tx, tz];
+        if (matchesRequestedIsland(tx, tz) && isSpotClear(tx, tz)) {
+          return [tx, tz];
         }
       }
     }
@@ -311,8 +331,8 @@ export function chooseSimCityPlot(opts: {
       for (const [ox, oz] of offsets) {
         const tx = snapGrid(cx + ox);
         const tz = snapGrid(cz + oz);
-        if (reqOnBagua ? tx >= 245 : tx <= 170) {
-          if (isSpotClear(tx, tz)) return [tx, tz];
+        if (matchesRequestedIsland(tx, tz) && isSpotClear(tx, tz)) {
+          return [tx, tz];
         }
       }
     }

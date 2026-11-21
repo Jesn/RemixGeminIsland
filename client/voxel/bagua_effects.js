@@ -13,6 +13,17 @@ export const TRIGRAMS = [
 ];
 
 export const MAIN_PORTAL_POS = [11.5, 5.5];
+export const KUNLUN_PORTAL_POS = [340, -460];
+
+export const WUXING_OF_TRIGRAM = ["木", "木", "火", "土", "金", "金", "水", "土"];
+export const WUXING_GENERATES = { 水: "木", 木: "火", 火: "土", 土: "金", 金: "水" };
+export const WUXING_COLOR_HEX = {
+  木: "#57e87a",
+  火: "#ff7242",
+  土: "#f4be3b",
+  金: "#ffe38f",
+  水: "#54c8ff",
+};
 
 export const PALACE_TRIGRAM_MAP = {
   "bagua-zhen-drumtower": 0,
@@ -871,7 +882,7 @@ export function createBaguaMysticSystem({
   altarParticles.raycast = () => {};
   altarGroup.add(altarParticles);
 
-  // ── 2. Linked Teleportation Portals (Main Island Plaza <-> Bagua Taiji Plaza)
+  // ── 2. Linked Teleportation Portals (Tri-Island Portal Network)
   const baguaPortalXZ = getBaguaPortalPos(baguaCenterX, baguaCenterZ);
   const portals = [
     {
@@ -882,9 +893,9 @@ export function createBaguaMysticSystem({
       destX: baguaPortalXZ[0],
       destZ: baguaPortalXZ[1],
       destIsland: "bagua",
-      destArriveOffsetX: -3.2, // Step toward Taiji Altar when arriving on Bagua? Wait: baguaPortalXZ is at cx - 18, altar is at cx (+x)
+      destArriveOffsetX: 3.2,
       destArriveOffsetZ: 0,
-      destYaw: -Math.PI * 0.5, // Look East toward Taiji Altar!
+      destYaw: -Math.PI * 0.5, // Look East toward Taiji Altar
       label: "传送至 八卦城太极坛",
       trigramIdx: 4, // West/Dui resonance
       accentHex: "#64dcff",
@@ -904,9 +915,37 @@ export function createBaguaMysticSystem({
       trigramIdx: 0, // East/Zhen resonance
       accentHex: "#ffd56b",
     },
+    {
+      id: "bagua_to_kunlun",
+      island: "bagua",
+      x: baguaCenterX,
+      z: baguaCenterZ - 27.2,
+      destX: KUNLUN_PORTAL_POS[0],
+      destZ: KUNLUN_PORTAL_POS[1],
+      destIsland: "kunlun",
+      destArriveOffsetX: 0,
+      destArriveOffsetZ: -3.2,
+      destYaw: Math.PI, // Look North toward Jade Palace
+      label: "传送至 蓬莱玄霜仙岛",
+      trigramIdx: 6, // North/Kan water-frost resonance
+      accentHex: "#7ef2ff",
+    },
+    {
+      id: "kunlun_to_main",
+      island: "kunlun",
+      x: KUNLUN_PORTAL_POS[0],
+      z: KUNLUN_PORTAL_POS[1],
+      destX: MAIN_PORTAL_POS[0],
+      destZ: MAIN_PORTAL_POS[1],
+      destIsland: "main",
+      destArriveOffsetX: -3.0,
+      destArriveOffsetZ: -1.4,
+      destYaw: 0.62,
+      label: "传送回 主岛中央广场",
+      trigramIdx: 5, // Qian sky resonance
+      accentHex: "#ffd56b",
+    },
   ];
-  // Arrival offset on Bagua Portal should move +3.2m East toward Taiji Altar (cx - 14.8, 0)
-  portals[0].destArriveOffsetX = 3.2;
 
   const portalVisuals = portals.map((spec) => {
     const g = new THREE.Group();
@@ -1145,7 +1184,7 @@ export function createBaguaMysticSystem({
     };
   });
 
-  // Glowing ground ley-line conduit connecting Bagua Portal to Taiji Altar
+  // Glowing ground ley-line conduits connecting Bagua Portals to Taiji Altar
   const conduitGeo = new THREE.PlaneGeometry(14.8, 0.84);
   conduitGeo.rotateX(-Math.PI / 2);
   const conduitMat = new THREE.MeshBasicMaterial({
@@ -1159,6 +1198,98 @@ export function createBaguaMysticSystem({
   conduitMesh.position.set(baguaCenterX - 15.8, 0.065, baguaCenterZ);
   conduitMesh.raycast = () => {};
   root.add(conduitMesh);
+
+  const northConduitGeo = new THREE.PlaneGeometry(0.84, 17.6);
+  northConduitGeo.rotateX(-Math.PI / 2);
+  const northConduitMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#7ef2ff"),
+    transparent: true,
+    opacity: 0.42,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const northConduitMesh = new THREE.Mesh(northConduitGeo, northConduitMat);
+  northConduitMesh.position.set(baguaCenterX, 0.066, baguaCenterZ - 18.2);
+  northConduitMesh.raycast = () => {};
+  root.add(northConduitMesh);
+
+  // Dusk Spirit Firefly Motes hovering above Bagua shrines, outer avenues & Taiji Altar
+  const FIREFLY_COUNT = 96;
+  const fireflyPos = new Float32Array(FIREFLY_COUNT * 3);
+  const fireflyCol = new Float32Array(FIREFLY_COUNT * 3);
+  const fireflyMeta = [];
+  for (let i = 0; i < FIREFLY_COUNT; i++) {
+    const isOuterRing = i % 3 === 0;
+    const rad = isOuterRing ? 152 + (i % 17) * 1.4 : 26 + (i % 23) * 4.5;
+    const ang = (i / FIREFLY_COUNT) * Math.PI * 2 + (i % 5) * 0.19;
+    const baseY = 1.2 + (i % 7) * 0.65;
+    fireflyMeta.push({ rad, ang, baseY, speed: (i % 2 === 0 ? 1 : -1) * (0.04 + (i % 5) * 0.015), phase: i * 0.73 });
+    fireflyPos[i * 3] = baguaCenterX + Math.cos(ang) * rad;
+    fireflyPos[i * 3 + 1] = baseY;
+    fireflyPos[i * 3 + 2] = baguaCenterZ + Math.sin(ang) * rad;
+    const fc = new THREE.Color(i % 2 === 0 ? "#ffe184" : "#7ef2ff");
+    fireflyCol[i * 3] = fc.r;
+    fireflyCol[i * 3 + 1] = fc.g;
+    fireflyCol[i * 3 + 2] = fc.b;
+  }
+  const fireflyGeo = new THREE.BufferGeometry();
+  fireflyGeo.setAttribute("position", new THREE.BufferAttribute(fireflyPos, 3));
+  fireflyGeo.setAttribute("color", new THREE.BufferAttribute(fireflyCol, 3));
+  const fireflyMat = new THREE.PointsMaterial({
+    size: 1.05,
+    map: glowTex,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+  const fireflyPoints = new THREE.Points(fireflyGeo, fireflyMat);
+  fireflyPoints.visible = false;
+  fireflyPoints.raycast = () => {};
+  root.add(fireflyPoints);
+
+  // WuXing Elemental Synergy Energy Arc pool (links generating palace -> generated palace)
+  const synergyArcSlots = [0, 1, 2].map(() => {
+    const mat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffd56b"),
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const dummyCurve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(baguaCenterX, 2, baguaCenterZ),
+      new THREE.Vector3(baguaCenterX, 14, baguaCenterZ),
+      new THREE.Vector3(baguaCenterX + 1, 2, baguaCenterZ),
+    );
+    const mesh = new THREE.Mesh(new THREE.TubeGeometry(dummyCurve, 28, 0.28, 8, false), mat);
+    mesh.visible = false;
+    mesh.raycast = () => {};
+    root.add(mesh);
+    return { active: false, elapsed: 0, duration: 2.8, mesh, mat };
+  });
+  let lastActivatedPalaceNode = null;
+  let synergyChainCount = 0;
+
+  function spawnWuXingSynergyArc(fromNode, toNode, colorHex) {
+    if (!fromNode || !toNode) return;
+    const slot = synergyArcSlots.find((s) => !s.active) || synergyArcSlots[0];
+    const p0 = new THREE.Vector3(fromNode.x, 2.8, fromNode.z);
+    const p2 = new THREE.Vector3(toNode.x, 2.8, toNode.z);
+    const span = p0.distanceTo(p2);
+    const mid = p0.clone().lerp(p2, 0.5);
+    mid.y = Math.max(12, Math.min(28, span * 0.24 + 8));
+    const curve = new THREE.QuadraticBezierCurve3(p0, mid, p2);
+    slot.mesh.geometry?.dispose?.();
+    slot.mesh.geometry = new THREE.TubeGeometry(curve, 32, 0.34, 8, false);
+    slot.mat.color.set(colorHex || "#ffd56b");
+    slot.mat.opacity = 0.92;
+    slot.active = true;
+    slot.elapsed = 0;
+    slot.mesh.visible = true;
+  }
 
   // ── 2b. Eight-Palace Trigram Mechanisms & Grand Ascendance Sky Column ─────
   const palaceGroup = new THREE.Group();
@@ -1587,6 +1718,42 @@ export function createBaguaMysticSystem({
     if (node) {
       node.burst = 1.35;
     }
+
+    // Check WuXing elemental generation chain (五行相生: 水->木->火->土->金->水)
+    const curElem = WUXING_OF_TRIGRAM[idx];
+    let generatedFromName = "";
+    let generatedFromElement = "";
+    if (
+      lastActivatedPalaceNode &&
+      lastActivatedPalaceNode.trigramIdx !== idx &&
+      WUXING_GENERATES[WUXING_OF_TRIGRAM[lastActivatedPalaceNode.trigramIdx]] === curElem
+    ) {
+      synergyChainCount += 1;
+      generatedFromName = lastActivatedPalaceNode.name;
+      generatedFromElement = WUXING_OF_TRIGRAM[lastActivatedPalaceNode.trigramIdx];
+      spawnWuXingSynergyArc(lastActivatedPalaceNode, node, WUXING_COLOR_HEX[curElem] || "#ffd56b");
+      fluxHz = Math.min(14.8, fluxHz + 1.45);
+      pulseBoost = Math.min(1.85, pulseBoost + 0.55);
+      if (playSound) {
+        try {
+          synth.playSampledBell((idx + 3) % 8, {
+            gainScale: 0.92,
+            isSympathetic: true,
+            energy: 0.96,
+            pan: 0.25,
+            fluxHz: 12.8,
+          });
+        } catch {
+          // ignore audio error
+        }
+      }
+    } else if (!lastActivatedPalaceNode || lastActivatedPalaceNode.trigramIdx !== idx) {
+      synergyChainCount = 1;
+    }
+    if (node) {
+      lastActivatedPalaceNode = node;
+    }
+
     triggerAltarPulse(idx, wasLit ? 1.15 : 1.4, playSound, { fromRemote: true });
 
     const activatedCount = palaceActivated.filter(Boolean).length;
@@ -1599,6 +1766,10 @@ export function createBaguaMysticSystem({
       wasLit,
       activatedCount,
       isComplete: isNowComplete,
+      synergyChain: generatedFromName ? synergyChainCount : 0,
+      generatedFromName,
+      generatedFromElement,
+      element: curElem,
       fromRemote,
     });
 
@@ -1613,6 +1784,7 @@ export function createBaguaMysticSystem({
       wasLit,
       activatedCount,
       grandTriggered: firstFullCompletion,
+      synergyChain: generatedFromName ? synergyChainCount : 0,
     };
   }
 
@@ -1626,7 +1798,7 @@ export function createBaguaMysticSystem({
         : portalOrId;
     if (!portal) return false;
 
-    const destIdx = portal.destIsland === "bagua" ? 4 : 0;
+    const destIdx = portal.destIsland === "bagua" ? 4 : portal.destIsland === "kunlun" ? 6 : 0;
     foldState.active = true;
     foldState.elapsed = 0;
     foldState.swapped = false;
@@ -1662,13 +1834,14 @@ export function createBaguaMysticSystem({
       activeCamera = null,
       spaceFoldOverlayEl = null,
       ogMode = false,
+      duskMix = 0,
     } = ctx;
 
     // Determine player/viewer distance to Bagua Center Taiji Altar
     const dx = viewerX - baguaCenterX;
     const dz = viewerZ - baguaCenterZ;
     const distToAltar = Math.hypot(dx, dz);
-    const onBagua = viewerX >= baguaCenterX * 0.5;
+    const onBagua = distToAltar < 265;
 
     const nextProx = distToAltar < 60 ? Math.max(0, Math.min(1, 1 - (distToAltar - 11.5) / 48.5)) : 0;
     playerProximity += (nextProx - playerProximity) * Math.min(1, dt * 6.5);
@@ -1908,6 +2081,40 @@ export function createBaguaMysticSystem({
     } else {
       grandBeamMesh.visible = false;
       grandInnerMesh.visible = false;
+    }
+
+    // Animate North Conduit, Dusk Spirit Fireflies & WuXing Synergy Arcs
+    const duskBoost = Math.max(0, Math.min(1, duskMix));
+    northConduitMat.color.copy(altarColor).lerp(new THREE.Color("#7ef2ff"), 0.55);
+    northConduitMat.opacity = 0.38 + duskBoost * 0.25 + pulseBoost * 0.18;
+
+    const fireflyAlpha = ogMode ? 0 : Math.max(0, (duskBoost - 0.12) / 0.88);
+    if (fireflyAlpha > 0.02) {
+      fireflyPoints.visible = true;
+      fireflyMat.opacity = fireflyAlpha * (0.72 + 0.22 * Math.sin(t * 2.1));
+      const fPos = fireflyGeo.attributes.position.array;
+      for (let i = 0; i < FIREFLY_COUNT; i++) {
+        const fm = fireflyMeta[i];
+        fm.ang += dt * fm.speed;
+        fPos[i * 3] = baguaCenterX + Math.cos(fm.ang) * fm.rad;
+        fPos[i * 3 + 1] = fm.baseY + Math.sin(t * 1.75 + fm.phase) * 0.55;
+        fPos[i * 3 + 2] = baguaCenterZ + Math.sin(fm.ang) * fm.rad;
+      }
+      fireflyGeo.attributes.position.needsUpdate = true;
+    } else {
+      fireflyPoints.visible = false;
+    }
+
+    for (const slot of synergyArcSlots) {
+      if (!slot.active) continue;
+      slot.elapsed += dt;
+      const su = Math.min(1, slot.elapsed / slot.duration);
+      const pulseEnv = Math.sin(su * Math.PI);
+      slot.mat.opacity = pulseEnv * 0.92;
+      if (su >= 1) {
+        slot.active = false;
+        slot.mesh.visible = false;
+      }
     }
 
     // ── Physics-Simulated "Folded Space" (折叠空间) Teleport Solver ─────────

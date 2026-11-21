@@ -18,6 +18,7 @@ import {
 } from "./voxel_dsl";
 import { computeIntelligentBuildingYaw } from "./town_planner";
 import { BAGUA_PROTECTED_PATH_IDS, BAGUA_PROTECTED_PROP_IDS } from "./bagua_island";
+import { KUNLUN_PROTECTED_PATH_IDS, KUNLUN_PROTECTED_PROP_IDS } from "./kunlun_island";
 
 export interface PartOverlapReport {
   partIndex: number;
@@ -859,11 +860,11 @@ const SEED_PROP_IDS = new Set([
 ]);
 
 function isProtectedSeedPathId(id: string): boolean {
-  return SEED_PATH_IDS.has(id) || BAGUA_PROTECTED_PATH_IDS.has(id);
+  return SEED_PATH_IDS.has(id) || BAGUA_PROTECTED_PATH_IDS.has(id) || KUNLUN_PROTECTED_PATH_IDS.has(id);
 }
 
 function isProtectedSeedPropId(id: string): boolean {
-  return SEED_PROP_IDS.has(id) || BAGUA_PROTECTED_PROP_IDS.has(id);
+  return SEED_PROP_IDS.has(id) || BAGUA_PROTECTED_PROP_IDS.has(id) || KUNLUN_PROTECTED_PROP_IDS.has(id);
 }
 
 function round1(v: number): number {
@@ -1463,6 +1464,7 @@ export function alignLandmarksToFrontage(
 
   for (const c of creations) {
     if (c.isSeed || c.isCompanion) continue;
+    if (c.id.startsWith("bagua-gate-") || c.id.startsWith("kunlun-")) continue;
     if (c.category !== "building" && c.behavior?.type !== "landmark") continue;
 
     const desiredYaw = computeIntelligentBuildingYaw(c, paths);
@@ -2436,7 +2438,12 @@ export function auditAndRepairWorldSpatial(
   };
 
   for (const b of buildingsRadial) {
-    if (b.id === "bagua-taiji-pavilion" || landmarkConnectedByAccepted(b) || accepted.length === 0) {
+    if (
+      b.id === "bagua-taiji-pavilion" ||
+      b.id.startsWith("bagua-gate-") ||
+      landmarkConnectedByAccepted(b) ||
+      accepted.length === 0
+    ) {
       continue;
     }
 

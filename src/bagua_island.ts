@@ -27,6 +27,17 @@ export const BAGUA_CREATION_IDS = {
 
 const BAGUA_RADIAL_DIRS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"] as const;
 
+export const BAGUA_GATE_DEFS = [
+  { dir: "e", gateName: "伤门", trigramLabel: "震东", angle: 0, accentHex: "#46e87a" },
+  { dir: "se", gateName: "杜门", trigramLabel: "巽东南", angle: Math.PI / 4, accentHex: "#2ee6c5" },
+  { dir: "s", gateName: "景门", trigramLabel: "离南", angle: Math.PI / 2, accentHex: "#ff5a36" },
+  { dir: "sw", gateName: "死门", trigramLabel: "坤西南", angle: (3 * Math.PI) / 4, accentHex: "#f4be3b" },
+  { dir: "w", gateName: "惊门", trigramLabel: "兑西", angle: Math.PI, accentHex: "#64dcff" },
+  { dir: "nw", gateName: "开门", trigramLabel: "乾西北", angle: (-3 * Math.PI) / 4, accentHex: "#c98cff" },
+  { dir: "n", gateName: "休门", trigramLabel: "坎北", angle: -Math.PI / 2, accentHex: "#338eff" },
+  { dir: "ne", gateName: "生门", trigramLabel: "艮东北", angle: -Math.PI / 4, accentHex: "#ffa042" },
+] as const;
+
 export const BAGUA_PROTECTED_PATH_IDS = new Set([
   "path-bagua-inner-ring",
   "path-bagua-ring-2",
@@ -36,20 +47,28 @@ export const BAGUA_PROTECTED_PATH_IDS = new Set([
   ...BAGUA_RADIAL_DIRS.map((d) => `path-bagua-radial2-${d}`),
   ...BAGUA_RADIAL_DIRS.map((d) => `path-bagua-radial3-${d}`),
   ...BAGUA_RADIAL_DIRS.map((d) => `path-bagua-court-${d}`),
+  ...BAGUA_RADIAL_DIRS.map((d) => `path-bagua-gate-${d}`),
 ]);
 
 export const BAGUA_PROTECTED_PROP_IDS = new Set([
   "prop-bagua-taiji-sign",
   "prop-bagua-dui-pond",
+  "prop-bagua-kan-pond",
   "prop-bagua-lantern-nw",
   "prop-bagua-lantern-sw",
   "prop-bagua-lantern-ne",
   "prop-bagua-lantern-se",
+  "prop-bagua-lantern-outer-e",
+  "prop-bagua-lantern-outer-w",
+  "prop-bagua-lantern-outer-n",
+  "prop-bagua-lantern-outer-s",
   "prop-bagua-bench-west",
   "prop-bagua-bench-south",
-  "prop-bagua-stop-gate",
-  "prop-bagua-stop-ring2",
-  "prop-bagua-stop-taiji",
+  "prop-bagua-bench-east",
+  "prop-bagua-bench-north",
+  "prop-bagua-stop-dui",
+  "prop-bagua-stop-kan",
+  "prop-bagua-stop-li",
 ]);
 
 export function getBaguaCoastWarp(_theta: number): number {
@@ -973,6 +992,59 @@ export function buildDapengRocBlueprint(): VoxelBlueprint {
   );
 }
 
+// ---------------------------------------------------------------------------
+// 12. 八门石牌坊 (Outer Ring-4 Ceremonial Bagua Gate Archways, Open & Walkable)
+// ---------------------------------------------------------------------------
+export function buildBaguaGateBlueprint(
+  gateName: string,
+  trigramLabel: string,
+  accentHex: string,
+): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: `八卦${gateName}牌坊`,
+      description: `屹立在川西八卦城四环城垣${trigramLabel}门户的青石朱柱飞檐牌坊（${gateName}），敞阔中门可供行人直穿进出。`,
+      category: "prop",
+      scaleClass: "medium",
+      palette: {
+        qingStone: "#8d9399",
+        stoneLight: "#c8ccd0",
+        cinnabar: "#b5332a",
+        timber: "#6e4226",
+        daiTile: "#28303b",
+        eaveTrim: "#758291",
+        gold: "#eab63e",
+        lantern: "#ffe296",
+        accent: accentHex,
+      },
+      ops: [
+        // Twin stone pillar bases flanking a wide 14-voxel clear central passageway (x = -7..7 completely open!)
+        { op: "box", x0: -10, y0: 0, z0: -3, x1: -7, y1: 2, z1: 3, color: "qingStone", mirrorX: true },
+        { op: "box", x0: -10, y0: 2, z0: -2, x1: -7, y1: 3, z1: 2, color: "stoneLight", mirrorX: true },
+        // Twin vertical cinnabar pillars Y=3..13
+        { op: "box", x0: -9, y0: 3, z0: -1, x1: -7, y1: 13, z1: 1, color: "cinnabar", mirrorX: true },
+        // Outer secondary side buttresses Y=0..10
+        { op: "box", x0: -12, y0: 0, z0: -2, x1: -10, y1: 2, z1: 2, color: "qingStone", mirrorX: true },
+        { op: "box", x0: -11, y0: 2, z0: -1, x1: -10, y1: 10, z1: 1, color: "timber", mirrorX: true },
+        // Elevated crossbeam & glowing trigram crest high overhead Y=12..16 (clear above head)
+        { op: "box", x0: -11, y0: 12, z0: -1, x1: 11, y1: 14, z1: 1, color: "timber" },
+        { op: "box", x0: -4, y0: 14, z0: -2, x1: 4, y1: 16, z1: 2, color: "cinnabar" },
+        { op: "box", x0: -2, y0: 14, z0: -2, x1: 2, y1: 16, z1: 2, color: "accent", emit: 1.15 },
+        // Side hanging warm stone lanterns on outer posts
+        { op: "box", x0: -12, y0: 9, z0: -1, x1: -11, y1: 11, z1: 1, color: "lantern", emit: 1.35, mirrorX: true },
+        // Upturned Dai-tile gateway roof Y=16..20
+        { op: "box", x0: -13, y0: 16, z0: -3, x1: 13, y1: 17, z1: 3, color: "eaveTrim" },
+        { op: "box", x0: -12, y0: 17, z0: -2, x1: 12, y1: 18, z1: 2, color: "daiTile" },
+        { op: "box", x0: -8, y0: 18, z0: -1, x1: 8, y1: 19, z1: 1, color: "daiTile" },
+        { op: "box", x0: -2, y0: 19, z0: -1, x1: 2, y1: 20, z1: 1, color: "gold", emit: 0.45 },
+      ],
+      parts: [],
+    },
+    `八卦${gateName}牌坊`,
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
 export function ensureBaguaIsland(state: {
   creations: WorldCreation[];
   paths: WorldPath[];
@@ -1160,6 +1232,22 @@ export function ensureBaguaIsland(state: {
     createdAtOffset: 900,
   });
 
+  // Eight Outer Ceremonial Gate Archways (八门石牌坊) guarding Ring 4 outer corners (r = 205.5m)
+  BAGUA_GATE_DEFS.forEach((gdef, idx) => {
+    const [gx, gz] = radialPt(gdef.angle, 205.5);
+    const gateYaw = Number(Math.atan2(CX - gx, -gz).toFixed(4));
+    ensureCreation({
+      id: `bagua-gate-${gdef.dir}`,
+      x: gx,
+      z: gz,
+      yaw: gateYaw,
+      builder: () => buildBaguaGateBlueprint(gdef.gateName, gdef.trigramLabel, gdef.accentHex),
+      activity: `镇守八卦${gdef.gateName}门户`,
+      statusLine: `川西八卦城四环外垣${gdef.trigramLabel}门户牌坊（${gdef.gateName}）`,
+      createdAtOffset: 910 + idx * 10,
+    });
+  });
+
   // Prune retired bridge approach paths, legacy stub paths, and any inner-ring radial0 stubs if loaded from a persisted snapshot
   const obsoleteIds = [
     "path-bridge-west-approach",
@@ -1275,6 +1363,13 @@ export function ensureBaguaIsland(state: {
       linear: true,
       points: [radialPt(rdef.angle, 143.7), radialPt(rdef.angle, 190.9)],
     });
+    // Outer ceremonial gate stone approach leading out of Ring 4 directly under the open gate archway (r = 197.8 -> 213.5)
+    ensurePath({
+      id: `path-bagua-gate-${rdef.dir}`,
+      kind: "cobblestone",
+      linear: true,
+      points: [radialPt(rdef.angle, 197.8), radialPt(rdef.angle, 213.5)],
+    });
     // Orthogonal (90° right-angle) cobblestone walkway linking each Trigram palace courtyard
     // perpendicularly straight onto Ring 2's flat edge midpoint
     const sectorAngle = rdef.angle + WEDGE_OFFSET;
@@ -1336,6 +1431,41 @@ export function ensureBaguaIsland(state: {
     z: zhenPos.z,
     radius: 21.5,
   });
+  ensureZone({
+    id: "zone-bagua-li-plaza",
+    biome: "stone_plaza",
+    x: liPos.x,
+    z: liPos.z,
+    radius: 20.5,
+  });
+  ensureZone({
+    id: "zone-bagua-xun-grove",
+    biome: "autumn_grove",
+    x: xunPos.x,
+    z: xunPos.z,
+    radius: 21.0,
+  });
+  ensureZone({
+    id: "zone-bagua-kun-meadow",
+    biome: "meadow_clover",
+    x: kunPos.x,
+    z: kunPos.z,
+    radius: 21.0,
+  });
+  ensureZone({
+    id: "zone-bagua-qian-plaza",
+    biome: "stone_plaza",
+    x: qianPos.x,
+    z: qianPos.z,
+    radius: 20.5,
+  });
+  ensureZone({
+    id: "zone-bagua-dui-plaza",
+    biome: "sandy_shore",
+    x: duiPos.x,
+    z: duiPos.z,
+    radius: 19.5,
+  });
 
   // 4. Scenic Props (Signs, Lotus Pond, Courtyard Lanterns, Benches)
   const ensureProp = (p: WorldProp) => {
@@ -1366,18 +1496,21 @@ export function ensureBaguaIsland(state: {
     details.push(`added Bagua prop "${p.id}"`);
   };
 
-  // Prune retired bridgehead signposts & main-island bridge shuttle stop if present in a persisted snapshot
+  // Prune retired bridgehead signposts & legacy ping-pong shuttle stops if present in a persisted snapshot
   const obsoletePropIds = [
     "prop-bagua-bridge-west-sign",
     "prop-bagua-bridge-east-sign",
     "prop-bagua-stop-plaza",
+    "prop-bagua-stop-gate",
+    "prop-bagua-stop-ring2",
+    "prop-bagua-stop-taiji",
   ];
   for (const obsoletePropId of obsoletePropIds) {
     const idx = state.props.findIndex((pr) => pr.id === obsoletePropId);
     if (idx >= 0) {
       state.props.splice(idx, 1);
       changed = true;
-      details.push(`removed obsolete bridge prop "${obsoletePropId}"`);
+      details.push(`removed obsolete bridge/shuttle prop "${obsoletePropId}"`);
     }
   }
 
@@ -1397,6 +1530,15 @@ export function ensureBaguaIsland(state: {
     yaw: 0,
     radius: 9.1,
     label: "兑泽荷风莲池",
+  });
+  ensureProp({
+    id: "prop-bagua-kan-pond",
+    kind: "pond",
+    x: CX + 44.5,
+    z: -99.2,
+    yaw: 0,
+    radius: 8.2,
+    label: "坎宫玄武玉泉",
   });
   // Place 4 plaza lanterns cleanly inside inter-radial sector wedges (22.5° off axes) so all 8 radial roads stay unobstructed
   const [lnwX, lnwZ] = radialPt(-Math.PI + WEDGE_OFFSET, 28.0);
@@ -1431,6 +1573,16 @@ export function ensureBaguaIsland(state: {
     z: lseZ,
     yaw: 0,
   });
+  // Outer Ring-3 garden lanterns & market benches inside sector wedges
+  const [loeX, loeZ] = radialPt(0 + WEDGE_OFFSET, 118.5);
+  const [lowX, lowZ] = radialPt(-Math.PI + WEDGE_OFFSET, 118.5);
+  const [lonX, lonZ] = radialPt(-Math.PI / 2 + WEDGE_OFFSET, 118.5);
+  const [losX, losZ] = radialPt(Math.PI / 2 + WEDGE_OFFSET, 118.5);
+  ensureProp({ id: "prop-bagua-lantern-outer-e", kind: "lamp_post", x: loeX, z: loeZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-lantern-outer-w", kind: "lamp_post", x: lowX, z: lowZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-lantern-outer-n", kind: "lamp_post", x: lonX, z: lonZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-lantern-outer-s", kind: "lamp_post", x: losX, z: losZ, yaw: 0 });
+
   ensureProp({
     id: "prop-bagua-bench-west",
     kind: "bench",
@@ -1446,59 +1598,85 @@ export function ensureBaguaIsland(state: {
     yaw: Math.PI / 2,
   });
   ensureProp({
-    id: "prop-bagua-stop-gate",
-    kind: "bus_stop",
-    x: 305.5,
-    z: 4.5,
-    yaw: Math.PI,
-    label: "兑泽城门站",
+    id: "prop-bagua-bench-east",
+    kind: "bench",
+    x: CX + 62.4,
+    z: 4.8,
+    yaw: 0,
   });
   ensureProp({
-    id: "prop-bagua-stop-ring2",
-    kind: "bus_stop",
-    x: 412.4,
-    z: 4.5,
-    yaw: Math.PI,
-    label: "二环坊市站",
-  });
-  ensureProp({
-    id: "prop-bagua-stop-taiji",
-    kind: "bus_stop",
-    x: 455.2,
-    z: 4.5,
-    yaw: Math.PI,
-    label: "太极坛西站",
+    id: "prop-bagua-bench-north",
+    kind: "bench",
+    x: CX + 4.8,
+    z: -62.5,
+    yaw: Math.PI / 2,
   });
 
-  // 5. Bagua City Island Sightseeing Shuttle (West Gate <-> Ring 2 Market <-> Taiji Plaza West)
-  const shuttleWaypoints: [number, number][] = [
-    [303.76, 0.0],
-    [358.1, 0.0],
-    [412.44, 0.0],
-    [458.2, 0.0],
-  ];
+  // Ring-2 Octagonal Sightseeing Loop Stations (3 stations balanced cleanly around Ring 2)
+  const stopDuiPos = radialPt(-Math.PI + WEDGE_OFFSET, Number(RING2_APOTHEM.toFixed(2)));
+  const stopKanPos = radialPt(-Math.PI / 2 + WEDGE_OFFSET, Number(RING2_APOTHEM.toFixed(2)));
+  const stopLiPos = radialPt(Math.PI / 2 + WEDGE_OFFSET, Number(RING2_APOTHEM.toFixed(2)));
+  const curbDuiPos = radialPt(-Math.PI + WEDGE_OFFSET, Number((RING2_APOTHEM - 4.2).toFixed(1)));
+  const curbKanPos = radialPt(-Math.PI / 2 + WEDGE_OFFSET, Number((RING2_APOTHEM - 4.2).toFixed(1)));
+  const curbLiPos = radialPt(Math.PI / 2 + WEDGE_OFFSET, Number((RING2_APOTHEM - 4.2).toFixed(1)));
+
+  ensureProp({
+    id: "prop-bagua-stop-dui",
+    kind: "bus_stop",
+    x: curbDuiPos[0],
+    z: curbDuiPos[1],
+    yaw: Number((-Math.PI + WEDGE_OFFSET + Math.PI * 0.5).toFixed(3)),
+    label: "二环·兑泽荷风站",
+  });
+  ensureProp({
+    id: "prop-bagua-stop-kan",
+    kind: "bus_stop",
+    x: curbKanPos[0],
+    z: curbKanPos[1],
+    yaw: Number((-Math.PI / 2 + WEDGE_OFFSET + Math.PI * 0.5).toFixed(3)),
+    label: "二环·坎水玄武站",
+  });
+  ensureProp({
+    id: "prop-bagua-stop-li",
+    kind: "bus_stop",
+    x: curbLiPos[0],
+    z: curbLiPos[1],
+    yaw: Number((Math.PI / 2 + WEDGE_OFFSET + Math.PI * 0.5).toFixed(3)),
+    label: "二环·离火古台站",
+  });
+
+  // 5. Bagua City Full-Ring Sightseeing Loop Shuttle (16-waypoint closed Ring-2 octagonal circuit)
+  const shuttleWaypoints: [number, number][] = [];
+  for (let side = 0; side < 8; side++) {
+    const cornerAngle = side * (Math.PI / 4);
+    const midAngle = cornerAngle + WEDGE_OFFSET;
+    shuttleWaypoints.push(radialPt(cornerAngle, 85.8));
+    shuttleWaypoints.push(radialPt(midAngle, Number(RING2_APOTHEM.toFixed(2))));
+  }
   const shuttleStops = [
     {
-      id: "stop-bagua-west-gate",
-      name: "兑泽城门站",
-      x: 303.8,
-      z: 0.0,
+      id: "stop-bagua-dui-loop",
+      name: "二环·兑泽荷风站",
+      x: stopDuiPos[0],
+      z: stopDuiPos[1],
       dwellSec: 2.0,
+      nearCreationId: BAGUA_CREATION_IDS.duiPavilion,
     },
     {
-      id: "stop-bagua-ring2-west",
-      name: "二环坊市站",
-      x: 412.4,
-      z: 0.0,
+      id: "stop-bagua-kan-loop",
+      name: "二环·坎水玄武站",
+      x: stopKanPos[0],
+      z: stopKanPos[1],
       dwellSec: 2.0,
+      nearCreationId: BAGUA_CREATION_IDS.kanWaterwheel,
     },
     {
-      id: "stop-bagua-taiji-west",
-      name: "太极坛西站",
-      x: 458.2,
-      z: 0.0,
+      id: "stop-bagua-li-loop",
+      name: "二环·离火古台站",
+      x: stopLiPos[0],
+      z: stopLiPos[1],
       dwellSec: 2.0,
-      nearCreationId: BAGUA_CREATION_IDS.taijiPavilion,
+      nearCreationId: BAGUA_CREATION_IDS.liStage,
     },
   ];
   const existingShuttle = state.creations.find((c) => c.id === BAGUA_CREATION_IDS.shuttleBus);
@@ -1506,64 +1684,76 @@ export function ensureBaguaIsland(state: {
     const bp = buildBaguaShuttleBlueprint();
     state.creations.push({
       id: BAGUA_CREATION_IDS.shuttleBus,
-      name: bp.name,
-      description: bp.description,
+      name: "八卦城环城观光专车",
+      description:
+        "沿八卦城二环八角坊市街道周而复始循环巡游的朱漆黄铜观光巴士，串联八卦八宫驿站与集市。",
       category: bp.category,
       scaleClass: bp.scaleClass,
-      x: 358.1,
-      z: 0,
-      yaw: Math.PI / 2,
+      x: stopDuiPos[0],
+      z: stopDuiPos[1],
+      yaw: 0,
       blueprint: bp,
       behavior: {
         type: "vehicle_route",
-        speed: 6.2,
-        loopMode: "pingpong",
+        speed: 6.4,
+        loopMode: "loop",
         waypoints: shuttleWaypoints,
         stops: shuttleStops,
-        statusLine: "正在八卦城兑泽大道与中天太极广场间观光接驳",
+        statusLine: "正在八卦城二环八角坊市环线循环观光接驳",
       },
       integratedLevel: 2,
       createdAt: 1793000001050,
       isSeed: false,
     });
     changed = true;
-    details.push("added Bagua City Sightseeing Shuttle");
+    details.push("added Bagua City Ring-2 Loop Sightseeing Shuttle");
   } else {
-    const oldWps =
-      existingShuttle.behavior?.type === "vehicle_route" && Array.isArray(existingShuttle.behavior.waypoints)
-        ? existingShuttle.behavior.waypoints
-        : [];
-    const crossesWater = oldWps.some((wp) => Number(wp?.[0]) < 290) || Number(existingShuttle.x) < 290;
-    if (crossesWater || existingShuttle.name.includes("跨海")) {
+    const curBeh = existingShuttle.behavior;
+    const isOldShuttle =
+      curBeh?.type !== "vehicle_route" ||
+      curBeh.loopMode !== "loop" ||
+      (curBeh.waypoints?.length || 0) < 16 ||
+      (curBeh.stops || []).some((s) => s.id === "stop-bagua-west-gate");
+    if (isOldShuttle) {
       const bp = buildBaguaShuttleBlueprint();
-      existingShuttle.name = bp.name;
-      existingShuttle.description = bp.description;
-      existingShuttle.x = Math.max(304, Number(existingShuttle.x) || 358.1);
-      existingShuttle.z = 0;
+      existingShuttle.name = "八卦城环城观光专车";
+      existingShuttle.description =
+        "沿八卦城二环八角坊市街道周而复始循环巡游的朱漆黄铜观光巴士，串联八卦八宫驿站与集市。";
+      existingShuttle.x = stopDuiPos[0];
+      existingShuttle.z = stopDuiPos[1];
       existingShuttle.behavior = {
         type: "vehicle_route",
-        speed: 6.2,
-        loopMode: "pingpong",
+        speed: 6.4,
+        loopMode: "loop",
         waypoints: shuttleWaypoints,
         stops: shuttleStops,
-        statusLine: "正在八卦城兑泽大道与中天太极广场间观光接驳",
+        statusLine: "正在八卦城二环八角坊市环线循环观光接驳",
       };
       changed = true;
-      details.push("rerouted Bagua Sightseeing Shuttle onto East Bagua Island");
+      details.push("upgraded Bagua Sightseeing Shuttle to Ring-2 closed octagonal loop");
     }
   }
 
-  // 6. Bagua City Residents (transit riders + palace courtyard strollers)
+  // 6. Bagua City Residents (Ring-2 transit loop riders + palace courtyard strollers)
   const ensureVillager = (v: WorldVillager) => {
     const existing = state.villagers.find((ex) => ex.id === v.id);
     if (existing) {
-      const hasMainStop = Array.isArray(existing.stops) && existing.stops.some((st) => Number(st?.[0]) < 250);
-      if (hasMainStop) {
+      const hasLegacyStops =
+        Array.isArray(existing.stops) &&
+        existing.stops.some(
+          (st) =>
+            Number(st?.[0]) < 250 ||
+            (v.usesTransit &&
+              (Math.abs(Number(st?.[0]) - 305.5) < 1.0 ||
+                Math.abs(Number(st?.[0]) - 412.4) < 1.0 ||
+                Math.abs(Number(st?.[0]) - 455.2) < 1.0)),
+        );
+      if (hasLegacyStops) {
         existing.homeX = v.homeX;
         existing.homeZ = v.homeZ;
         existing.stops = v.stops;
         changed = true;
-        details.push(`rerouted Bagua villager "${v.name}" onto East Bagua Island`);
+        details.push(`rerouted Bagua villager "${v.name}" onto Ring-2 loop stations`);
       }
       return;
     }
@@ -1578,13 +1768,9 @@ export function ensureBaguaIsland(state: {
     role: "artist",
     hatColor: "#e8ba4e",
     shirtColor: "#2d786a",
-    homeX: 305.5,
-    homeZ: 4.5,
-    stops: [
-      [305.5, 4.5],
-      [412.4, 4.5],
-      [455.2, 4.5],
-    ],
+    homeX: curbDuiPos[0],
+    homeZ: curbDuiPos[1],
+    stops: [curbDuiPos, curbKanPos, curbLiPos],
     usesTransit: true,
   });
   ensureVillager({
@@ -1593,13 +1779,9 @@ export function ensureBaguaIsland(state: {
     role: "commuter",
     hatColor: "#b83c32",
     shirtColor: "#4b6d8a",
-    homeX: 412.4,
-    homeZ: 4.5,
-    stops: [
-      [412.4, 4.5],
-      [305.5, 4.5],
-      [455.2, 4.5],
-    ],
+    homeX: curbKanPos[0],
+    homeZ: curbKanPos[1],
+    stops: [curbKanPos, curbLiPos, curbDuiPos],
     usesTransit: true,
   });
   ensureVillager({
@@ -1608,13 +1790,9 @@ export function ensureBaguaIsland(state: {
     role: "student",
     hatColor: "#64dcff",
     shirtColor: "#8b5fbf",
-    homeX: 455.2,
-    homeZ: 4.5,
-    stops: [
-      [455.2, 4.5],
-      [305.5, 4.5],
-      [412.4, 4.5],
-    ],
+    homeX: curbLiPos[0],
+    homeZ: curbLiPos[1],
+    stops: [curbLiPos, curbDuiPos, curbKanPos],
     usesTransit: true,
   });
   ensureVillager({
