@@ -23,9 +23,34 @@ export const BAGUA_CREATION_IDS = {
   qianObservatory: "bagua-qian-observatory",
   shuttleBus: "bagua-shuttle-bus",
   dapengRoc: "world-dapeng-roc",
+  // Ring 1-2 Inner Commercial & Cultural Ward
+  innerTeahouse: "bagua-inner-teahouse",
+  innerSilkshop: "bagua-inner-silkshop",
+  innerGuqin: "bagua-inner-guqin",
+  innerApothecary: "bagua-inner-apothecary",
+  innerChess: "bagua-inner-chess",
+  innerAstrology: "bagua-inner-astrology",
+  innerBookstore: "bagua-inner-bookstore",
+  // Ring 3-4 Outer Craft, Culinary & Gallery Ward
+  outerForge: "bagua-outer-forge",
+  outerTavern: "bagua-outer-tavern",
+  outerLightsOut: "bagua-outer-lightsout",
+  outerInn: "bagua-outer-inn",
+  outerCurio: "bagua-outer-curio",
+  outerLighthouse: "bagua-outer-lighthouse",
+  outerPagoda: "bagua-outer-pagoda",
+  outerDyehouse: "bagua-outer-dyehouse",
+  // Ring 3-4 Street Market Stalls, Central Monument & Coastal Viewing Piers
+  marketNoodles: "bagua-market-noodles",
+  marketOpera: "bagua-market-opera",
+  courtyardStele: "bagua-courtyard-stele",
+  shorePierE: "bagua-shore-pier-e",
+  shorePierW: "bagua-shore-pier-w",
 } as const;
 
 const BAGUA_RADIAL_DIRS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"] as const;
+const BAGUA_INNER_SPUR_DIRS = ["e", "se", "s", "sw", "nw", "n", "ne"] as const;
+const BAGUA_OUTER_SPUR_DIRS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"] as const;
 
 export const BAGUA_GATE_DEFS = [
   { dir: "e", gateName: "伤门", trigramLabel: "震东", angle: 0, accentHex: "#46e87a" },
@@ -48,6 +73,10 @@ export const BAGUA_PROTECTED_PATH_IDS = new Set([
   ...BAGUA_RADIAL_DIRS.map((d) => `path-bagua-radial3-${d}`),
   ...BAGUA_RADIAL_DIRS.map((d) => `path-bagua-court-${d}`),
   ...BAGUA_RADIAL_DIRS.map((d) => `path-bagua-gate-${d}`),
+  ...BAGUA_INNER_SPUR_DIRS.map((d) => `path-bagua-inner-spur-${d}`),
+  ...BAGUA_OUTER_SPUR_DIRS.map((d) => `path-bagua-outer-spur-${d}`),
+  "path-bagua-shore-e",
+  "path-bagua-shore-w",
 ]);
 
 export const BAGUA_PROTECTED_PROP_IDS = new Set([
@@ -62,10 +91,29 @@ export const BAGUA_PROTECTED_PROP_IDS = new Set([
   "prop-bagua-lantern-outer-w",
   "prop-bagua-lantern-outer-n",
   "prop-bagua-lantern-outer-s",
+  "prop-bagua-lantern-ring4-ne",
+  "prop-bagua-lantern-ring4-se",
+  "prop-bagua-lantern-ring4-sw",
+  "prop-bagua-lantern-ring4-nw",
   "prop-bagua-bench-west",
   "prop-bagua-bench-south",
   "prop-bagua-bench-east",
   "prop-bagua-bench-north",
+  "prop-bagua-bench-outer-se",
+  "prop-bagua-bench-outer-sw",
+  "prop-bagua-bench-outer-w",
+  "prop-bagua-bench-outer-n",
+  "prop-bagua-flower-dui",
+  "prop-bagua-flower-taiji-n",
+  "prop-bagua-flower-taiji-s",
+  "prop-bagua-flower-outer-w",
+  "prop-bagua-flower-outer-nw",
+  "prop-bagua-tree-inner-ne",
+  "prop-bagua-tree-inner-se",
+  "prop-bagua-tree-outer-ne",
+  "prop-bagua-tree-outer-sw",
+  "prop-bagua-tree-outer-nw",
+  "prop-bagua-tree-outer-n",
   "prop-bagua-stop-dui",
   "prop-bagua-stop-kan",
   "prop-bagua-stop-li",
@@ -1045,6 +1093,857 @@ export function buildBaguaGateBlueprint(
   );
 }
 
+// ---------------------------------------------------------------------------
+// 13. 八卦城内城坊市建筑与互动灵台 (Ring 1-2 & Ring 3-4 Infill Landmarks)
+// ---------------------------------------------------------------------------
+
+// 13a. 八卦盖碗茶馆 (Sichuan Covered-Bowl Teahouse)
+export function buildBaguaTeahouseBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "八卦盖碗茶馆",
+      description:
+        "川西青瓦竹廊盖碗茶馆，红灯映暖窗，檐前铜壶蒸雾氤氲，迎着二环坊市客流煮茶待客。",
+      category: "building",
+      scaleClass: "medium",
+      palette: {
+        qingStone: "#8d9399",
+        plaster: "#f3ecdf",
+        timber: "#6f4526",
+        bamboo: "#679c4c",
+        daiTile: "#2a313c",
+        cinnabar: "#b8362c",
+        lanternGlow: "#ffe296",
+        copper: "#d68c3e",
+        gold: "#ebb93c",
+      },
+      ops: [
+        { op: "box", x0: -8, y0: 0, z0: -7, x1: 8, y1: 1, z1: 7, color: "qingStone" },
+        { op: "stairs", x0: -2, y0: 0, z0: 7, steps: 1, width: 4, dir: "+z", color: "qingStone" },
+        { op: "hollowBox", x0: -6, y0: 1, z0: -5, x1: 6, y1: 8, z1: 5, wall: 1, color: "plaster", trim: "timber" },
+        { op: "arch", cx: 0, y0: 1, cz: 4, halfSpan: 2, height: 5, depth: 2, axis: "z", color: "cinnabar" },
+        { op: "box", x0: 3, y0: 3, z0: 4, x1: 5, y1: 6, z1: 5, color: "lanternGlow", emit: 1.0, mirrorX: true },
+        // Bamboo porch pillars
+        { op: "cylinder", axis: "y", cx: 6, y0: 1, y1: 8, cz: 6, radius: 0.55, color: "bamboo", mirrorX: true },
+        { op: "roofGable", x0: -8, yBase: 8, z0: -7, x1: 8, z1: 7, rise: 5, axis: "x", color: "daiTile", trim: "gold" },
+        // Decorative gilded copper tea kettle finial
+        { op: "cylinder", axis: "y", cx: 0, y0: 13, y1: 15, cz: 0, radius: 1.1, color: "copper" },
+        { op: "box", x0: -2, y0: 14, z0: 0, x1: 2, y1: 15, z1: 1, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "tea-lantern-l",
+          kind: "swingZ",
+          speed: 1.7,
+          amp: 0.18,
+          pivot: [-6, 7.6, 6.2],
+          ops: [
+            { op: "box", x0: 0, y0: -1, z0: 0, x1: 1, y1: 0, z1: 1, color: "timber" },
+            { op: "sphere", cx: 0, cy: -1.8, cz: 0, rx: 0.9, ry: 1.1, rz: 0.9, color: "lanternGlow", emit: 1.2 },
+          ],
+        },
+        {
+          name: "tea-lantern-r",
+          kind: "swingZ",
+          speed: 1.7,
+          amp: 0.18,
+          phase: 1.3,
+          pivot: [6, 7.6, 6.2],
+          ops: [
+            { op: "box", x0: 0, y0: -1, z0: 0, x1: 1, y1: 0, z1: 1, color: "timber" },
+            { op: "sphere", cx: 0, cy: -1.8, cz: 0, rx: 0.9, ry: 1.1, rz: 0.9, color: "lanternGlow", emit: 1.2 },
+          ],
+        },
+      ],
+    },
+    "八卦盖碗茶馆",
+  );
+}
+
+// 13b. 锦绣蜀绣坊 (Shu Brocade & Lantern Craft Atelier)
+export function buildBaguaSilkShopBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "锦绣蜀绣坊",
+      description:
+        "二环离火内坊的手工蜀绣锦缎铺，檐下垂挂五彩绫罗布幡与吉祥灯笼，尽显巴蜀织造神韵。",
+      category: "building",
+      scaleClass: "medium",
+      palette: {
+        qingStone: "#8d9399",
+        qingBrick: "#4d5561",
+        plaster: "#f2eadb",
+        daiTile: "#28303b",
+        cinnabar: "#c2342b",
+        silkPink: "#eb6f92",
+        silkTeal: "#3bb39e",
+        gold: "#ebb93c",
+        timber: "#6f4426",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "box", x0: -8, y0: 0, z0: -7, x1: 8, y1: 1, z1: 7, color: "qingStone" },
+        { op: "hollowBox", x0: -6, y0: 1, z0: -5, x1: 6, y1: 9, z1: 5, wall: 1, color: "qingBrick", trim: "cinnabar" },
+        { op: "arch", cx: 0, y0: 1, cz: 4, halfSpan: 2, height: 5, depth: 2, axis: "z", color: "gold" },
+        { op: "box", x0: 3, y0: 3, z0: 4, x1: 5, y1: 7, z1: 5, color: "lanternGlow", emit: 0.95, mirrorX: true },
+        // Colorful brocade banners flanking doorway
+        { op: "box", x0: -6, y0: 2, z0: 5, x1: -4, y1: 7, z1: 6, color: "silkPink", emit: 0.25 },
+        { op: "box", x0: 4, y0: 2, z0: 5, x1: 6, y1: 7, z1: 6, color: "silkTeal", emit: 0.25 },
+        { op: "roofGable", x0: -8, yBase: 9, z0: -7, x1: 8, z1: 7, rise: 5, axis: "x", color: "daiTile", trim: "cinnabar" },
+        // Stepped gable finials
+        { op: "box", x0: -7, y0: 8, z0: -6, x1: -6, y1: 12, z1: 6, color: "plaster" },
+        { op: "box", x0: 6, y0: 8, z0: -6, x1: 7, y1: 12, z1: 6, color: "plaster" },
+      ],
+      parts: [],
+    },
+    "锦绣蜀绣坊",
+  );
+}
+
+// 13c. 青囊百草堂 (Traditional Herbal Apothecary Hall)
+export function buildBaguaApothecaryBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "青囊百草堂",
+      description:
+        "东方震木内坊的川药百草堂，青翠药圃环绕飞檐石砌医馆，阁顶悬一尊生机盎然的翡翠药葫芦。",
+      category: "building",
+      scaleClass: "medium",
+      palette: {
+        qingStone: "#8c9399",
+        qingBrick: "#4b555c",
+        plaster: "#f3ece0",
+        daiTile: "#28303b",
+        timber: "#6e4226",
+        jadeHerb: "#49b879",
+        herbLeaf: "#75d966",
+        gold: "#ebb93c",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "box", x0: -8, y0: 0, z0: -7, x1: 8, y1: 1, z1: 7, color: "qingStone" },
+        { op: "hollowBox", x0: -6, y0: 1, z0: -5, x1: 6, y1: 9, z1: 5, wall: 1, color: "plaster", trim: "timber" },
+        { op: "arch", cx: 0, y0: 1, cz: 4, halfSpan: 2, height: 5, depth: 2, axis: "z", color: "timber" },
+        { op: "box", x0: 3, y0: 3, z0: 4, x1: 5, y1: 6, z1: 5, color: "lanternGlow", emit: 0.95, mirrorX: true },
+        // Herb planters flanking entrance
+        { op: "box", x0: 4, y0: 1, z0: 5, x1: 7, y1: 2, z1: 7, color: "qingBrick", mirrorX: true },
+        { op: "sphere", cx: 5.5, cy: 3.0, cz: 6, rx: 1.3, ry: 1.1, rz: 1.3, color: "herbLeaf", mirrorX: true },
+        { op: "roofPyramid", x0: -8, yBase: 9, z0: -7, x1: 8, z1: 7, color: "daiTile", trim: "jadeHerb" },
+        { op: "cylinder", axis: "y", cx: 0, y0: 13, y1: 15, cz: 0, radius: 0.6, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "apothecary-jade-gourd",
+          kind: "bob",
+          speed: 1.5,
+          amp: 0.38,
+          pivot: [0, 17.5, 0],
+          ops: [
+            { op: "sphere", cx: 0, cy: 0, cz: 0, rx: 1.3, ry: 1.5, rz: 1.3, color: "jadeHerb", emit: 0.65 },
+            { op: "sphere", cx: 0, cy: 1.8, cz: 0, rx: 0.9, ry: 1.0, rz: 0.9, color: "gold", emit: 0.5 },
+          ],
+        },
+      ],
+    },
+    "青囊百草堂",
+  );
+}
+
+// 13d. 天机星象算馆 (Mystical Bagua Star-Chart & Divination Hall)
+export function buildBaguaAstrologyBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "天机星象算馆",
+      description:
+        "坎北内坊星象演易之所，深蓝琉璃攒尖顶悬着一颗微光八卦星盘，推演周天流转。",
+      category: "building",
+      scaleClass: "medium",
+      palette: {
+        qingStone: "#8b929a",
+        slateDark: "#2d3647",
+        azureRoof: "#275d85",
+        cinnabar: "#b5332a",
+        gold: "#ebb93c",
+        starCyan: "#64dcff",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "cylinder", axis: "y", cx: 0, y0: 0, y1: 1, cz: 0, radius: 8.2, color: "qingStone" },
+        { op: "hollowBox", x0: -5, y0: 1, z0: -5, x1: 5, y1: 10, z1: 5, wall: 1, color: "slateDark", trim: "gold" },
+        { op: "arch", cx: 0, y0: 1, cz: 4, halfSpan: 2, height: 5, depth: 2, axis: "z", color: "cinnabar" },
+        { op: "box", x0: 3, y0: 4, z0: 4, x1: 4, y1: 7, z1: 5, color: "starCyan", emit: 1.0, mirrorX: true },
+        { op: "cone", cx: 0, y0: 10, y1: 16, cz: 0, rBottom: 8.2, rTop: 1.4, color: "azureRoof" },
+        { op: "ring", axis: "y", cx: 0, y0: 10, y1: 11, cz: 0, outerR: 8.4, innerR: 6.4, color: "gold" },
+        { op: "cylinder", axis: "y", cx: 0, y0: 16, y1: 18, cz: 0, radius: 0.6, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "astrology-star-ring",
+          kind: "spinY",
+          speed: 0.9,
+          pivot: [0, 20.5, 0],
+          ops: [
+            { op: "ring", axis: "y", cx: 0, y0: 0, y1: 1, cz: 0, outerR: 2.6, innerR: 1.8, color: "gold", emit: 0.6 },
+            { op: "sphere", cx: 0, cy: 0.5, cz: 0, rx: 1.0, ry: 1.0, rz: 1.0, color: "starCyan", emit: 1.25 },
+          ],
+        },
+      ],
+    },
+    "天机星象算馆",
+  );
+}
+
+// 13e. 阆中墨香书斋 (Langzhong Calligraphy & Classics Bookstore)
+export function buildBaguaBookstoreBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "阆中墨香书斋",
+      description:
+        "乾西北内坊的青砖雅致书斋，门悬书卷楹联与暖光纸窗，供往来文士品读阆中古韵与易经典籍。",
+      category: "building",
+      scaleClass: "medium",
+      palette: {
+        qingStone: "#8d9399",
+        qingBrick: "#4e5662",
+        plaster: "#f3ece0",
+        daiTile: "#28303b",
+        timber: "#6b4024",
+        inkTeal: "#2b7375",
+        gold: "#ebb93c",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "box", x0: -8, y0: 0, z0: -7, x1: 8, y1: 1, z1: 7, color: "qingStone" },
+        { op: "hollowBox", x0: -6, y0: 1, z0: -5, x1: 6, y1: 9, z1: 5, wall: 1, color: "qingBrick", trim: "timber" },
+        { op: "box", x0: -5, y0: 2, z0: -5, x1: 5, y1: 8, z1: 5, color: "plaster" },
+        { op: "arch", cx: 0, y0: 1, cz: 4, halfSpan: 2, height: 5, depth: 2, axis: "z", color: "timber" },
+        { op: "box", x0: -3, y0: 6, z0: 5, x1: 3, y1: 8, z1: 6, color: "inkTeal" },
+        { op: "box", x0: 3, y0: 3, z0: 4, x1: 5, y1: 6, z1: 5, color: "lanternGlow", emit: 0.95, mirrorX: true },
+        { op: "roofGable", x0: -8, yBase: 9, z0: -7, x1: 8, z1: 7, rise: 5, axis: "x", color: "daiTile", trim: "gold" },
+      ],
+      parts: [],
+    },
+    "阆中墨香书斋",
+  );
+}
+
+// 13f. 流觞丝竹琴台 (Interactive Pentatonic Guqin Floor-Piano Pavilion)
+export function buildBaguaGuqinDeckBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "流觞丝竹琴台",
+      description:
+        "巽位内坊的露天八卦雅乐石台，踏上或点按八枚温润玉键即可奏出古韵五声丝竹清音。",
+      category: "prop",
+      scaleClass: "medium",
+      interaction: { kind: "floor_piano" },
+      palette: {
+        qingStone: "#8d9399",
+        stoneLight: "#c9cdd2",
+        jadeAccent: "#38a68e",
+        gold: "#ebb93c",
+        cinnabar: "#b5332a",
+      },
+      ops: [
+        // Low unobstructed terrace so floor_piano keys mount cleanly on top!
+        { op: "box", x0: -9, y0: 0, z0: -6, x1: 9, y1: 1, z1: 6, color: "qingStone" },
+        { op: "box", x0: -8, y0: 1, z0: -5, x1: 8, y1: 2, z1: 5, color: "stoneLight" },
+        { op: "box", x0: -9, y0: 0, z0: -6, x1: -8, y1: 4, z1: -5, color: "cinnabar", mirrorX: true },
+        { op: "box", x0: -9, y0: 4, z0: -6, x1: -8, y1: 5, z1: -5, color: "gold", mirrorX: true },
+        { op: "box", x0: -9, y0: 0, z0: 5, x1: -8, y1: 4, z1: 6, color: "cinnabar", mirrorX: true },
+        { op: "box", x0: -9, y0: 4, z0: 5, x1: -8, y1: 5, z1: 6, color: "jadeAccent", emit: 0.7, mirrorX: true },
+      ],
+      parts: [],
+    },
+    "流觞丝竹琴台",
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
+// 13g. 八卦九宫弈台 (Interactive Stone-and-Jade Tic-Tac-Toe Court)
+export function buildBaguaChessCourtBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "八卦九宫弈台",
+      description:
+        "艮位内坊的青石对弈棋坪，可点击九宫棋格或按 E 与八卦棋灵对弈切磋。",
+      category: "prop",
+      scaleClass: "medium",
+      interaction: { kind: "tic_tac_toe" },
+      palette: {
+        qingStone: "#8d9399",
+        stoneLight: "#cfd3d8",
+        timber: "#6e4226",
+        gold: "#ebb93c",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        // Solid stone table center y=0..3 so tic_tac_toe mounts flush on top!
+        { op: "box", x0: -7, y0: 0, z0: -7, x1: 7, y1: 1, z1: 7, color: "qingStone" },
+        { op: "box", x0: -5, y0: 1, z0: -5, x1: 5, y1: 3, z1: 5, color: "stoneLight" },
+        { op: "box", x0: -7, y0: 0, z0: -7, x1: -6, y1: 4, z1: -6, color: "timber", mirrorX: true },
+        { op: "box", x0: -7, y0: 4, z0: -7, x1: -6, y1: 5, z1: -6, color: "lanternGlow", emit: 0.9, mirrorX: true },
+        { op: "box", x0: -7, y0: 0, z0: 6, x1: -6, y1: 4, z1: 7, color: "timber", mirrorX: true },
+        { op: "box", x0: -7, y0: 4, z0: 6, x1: -6, y1: 5, z1: 7, color: "gold", emit: 0.5, mirrorX: true },
+      ],
+      parts: [],
+    },
+    "八卦九宫弈台",
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
+// 13h. 蜀山铸剑铁匠铺 (Outer Ring 3-4 Forge & Bronze Chime Smithy)
+export function buildBaguaForgeBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "蜀山铸剑铁匠铺",
+      description:
+        "震东外坊的玄石铸铁工坊，红炉烟囱炉火映天，门旁水轮砂轮昼夜砥砺铜钟剑器。",
+      category: "building",
+      scaleClass: "large",
+      palette: {
+        basalt: "#464b54",
+        qingStone: "#8d9399",
+        brickDark: "#6a342a",
+        daiTile: "#28303b",
+        timber: "#6b3e22",
+        ember: "#ff6a2b",
+        amber: "#ffbe4f",
+        steel: "#aeb8c2",
+      },
+      ops: [
+        { op: "box", x0: -10, y0: 0, z0: -8, x1: 10, y1: 2, z1: 8, color: "basalt" },
+        { op: "stairs", x0: -3, y0: 0, z0: 8, steps: 2, width: 6, dir: "+z", color: "qingStone" },
+        { op: "hollowBox", x0: -8, y0: 2, z0: -6, x1: 7, y1: 10, z1: 6, wall: 1, color: "qingStone", trim: "timber" },
+        { op: "arch", cx: -1, y0: 2, cz: 5, halfSpan: 2, height: 6, depth: 2, axis: "z", color: "brickDark" },
+        // Glowing furnace chimney on the east wing
+        { op: "box", x0: 4, y0: 2, z0: -5, x1: 8, y1: 17, z1: -1, color: "brickDark" },
+        { op: "box", x0: 5, y0: 17, z0: -4, x1: 7, y1: 18, z1: -2, color: "ember", emit: 1.4 },
+        { op: "box", x0: 4, y0: 3, z0: 3, x1: 6, y1: 6, z1: 6, color: "amber", emit: 1.1 },
+        { op: "roofGable", x0: -9, yBase: 10, z0: -7, x1: 8, z1: 7, rise: 5, axis: "x", color: "daiTile", trim: "basalt" },
+      ],
+      parts: [
+        {
+          // Spinning steel grindstone out in front-right yard (cleared cleanly of wall!)
+          name: "forge-grindstone",
+          kind: "spinX",
+          speed: 1.35,
+          pivot: [9.5, 4.5, 4.5],
+          ops: [
+            { op: "ring", axis: "x", x0: -1, x1: 1, cy: 0, cz: 0, outerR: 2.3, innerR: 1.0, color: "steel" },
+            { op: "box", x0: 0, y0: -2, z0: 0, x1: 1, y1: 2, z1: 1, color: "amber", emit: 0.5 },
+          ],
+        },
+      ],
+    },
+    "蜀山铸剑铁匠铺",
+  );
+}
+
+// 13i. 川味醉仙酒肆 (Outer Ring 3-4 Two-Story Red-Lantern Sichuan Tavern)
+export function buildBaguaTavernBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "川味醉仙酒肆",
+      description:
+        "巽东南外坊的两层朱漆画栋酒肆，满楼灯笼暖光映照三环夜色，川香酒旗随海风轻摆。",
+      category: "building",
+      scaleClass: "large",
+      palette: {
+        qingStone: "#8d9399",
+        qingBrick: "#4e5660",
+        plaster: "#f3eadb",
+        cinnabar: "#c23228",
+        timber: "#6e4024",
+        daiTile: "#28303b",
+        gold: "#ebb93c",
+        lanternRed: "#f24a38",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "box", x0: -10, y0: 0, z0: -8, x1: 10, y1: 2, z1: 8, color: "qingStone" },
+        { op: "stairs", x0: -3, y0: 0, z0: 8, steps: 2, width: 6, dir: "+z", color: "qingStone" },
+        { op: "hollowBox", x0: -8, y0: 2, z0: -6, x1: 8, y1: 10, z1: 6, wall: 1, color: "qingBrick", trim: "cinnabar" },
+        { op: "arch", cx: 0, y0: 2, cz: 5, halfSpan: 2, height: 6, depth: 2, axis: "z", color: "cinnabar" },
+        { op: "box", x0: 4, y0: 4, z0: 5, x1: 6, y1: 7, z1: 6, color: "lanternGlow", emit: 1.05, mirrorX: true },
+        { op: "ring", axis: "y", cx: 0, y0: 9, y1: 10, cz: 0, outerR: 9.8, innerR: 7.4, color: "daiTile" },
+        // Second floor dining gallery
+        { op: "hollowBox", x0: -6, y0: 10, z0: -5, x1: 6, y1: 16, z1: 5, wall: 1, color: "plaster", trim: "cinnabar" },
+        { op: "box", x0: -4, y0: 11, z0: 4, x1: 4, y1: 14, z1: 5, color: "lanternGlow", emit: 1.0 },
+        { op: "roofGable", x0: -8, yBase: 16, z0: -7, x1: 8, z1: 7, rise: 5, axis: "x", color: "daiTile", trim: "gold" },
+      ],
+      parts: [
+        {
+          name: "tavern-wine-banner",
+          kind: "swingZ",
+          speed: 1.6,
+          amp: 0.16,
+          pivot: [9.2, 13.5, 5.5],
+          ops: [
+            { op: "box", x0: 0, y0: -4, z0: 0, x1: 1, y1: 0, z1: 1, color: "gold" },
+            { op: "box", x0: -1, y0: -5, z0: 0, x1: 2, y1: -1, z1: 1, color: "lanternRed", emit: 0.7 },
+          ],
+        },
+      ],
+    },
+    "川味醉仙酒肆",
+  );
+}
+
+// 13j. 八卦悦来客栈 (Outer Ring 3-4 Sichuan Timber Guest Inn)
+export function buildBaguaInnBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "八卦悦来客栈",
+      description:
+        "坤西南外坊的木构穿斗客栈，马头墙环抱暖光客房，为远游三岛的旅人提供歇脚落宿之所。",
+      category: "building",
+      scaleClass: "large",
+      palette: {
+        qingStone: "#8d9399",
+        plaster: "#f3ece0",
+        timber: "#7a4c2a",
+        cinnabar: "#b5332a",
+        daiTile: "#28303b",
+        gold: "#ebb93c",
+        lanternGlow: "#ffe296",
+        leaf: "#4e964b",
+      },
+      ops: [
+        { op: "box", x0: -10, y0: 0, z0: -8, x1: 10, y1: 2, z1: 8, color: "qingStone" },
+        { op: "stairs", x0: -3, y0: 0, z0: 8, steps: 2, width: 6, dir: "+z", color: "qingStone" },
+        { op: "hollowBox", x0: -8, y0: 2, z0: -6, x1: 8, y1: 11, z1: 6, wall: 1, color: "plaster", trim: "timber" },
+        { op: "arch", cx: 0, y0: 2, cz: 5, halfSpan: 2, height: 6, depth: 2, axis: "z", color: "cinnabar" },
+        { op: "box", x0: 4, y0: 4, z0: 5, x1: 6, y1: 8, z1: 6, color: "lanternGlow", emit: 0.95, mirrorX: true },
+        { op: "box", x0: -3, y0: 8, z0: 6, x1: 3, y1: 10, z1: 7, color: "gold" },
+        // Stepped gables
+        { op: "box", x0: 8, y0: 9, z0: -7, x1: 9, y1: 14, z1: 7, color: "plaster", mirrorX: true },
+        { op: "roofGable", x0: -9, yBase: 11, z0: -7, x1: 9, z1: 7, rise: 5, axis: "x", color: "daiTile", trim: "timber" },
+        { op: "sphere", cx: -8, cy: 3.5, cz: 7, rx: 1.5, ry: 1.5, rz: 1.5, color: "leaf", mirrorX: true },
+      ],
+      parts: [],
+    },
+    "八卦悦来客栈",
+  );
+}
+
+// 13k. 太古灵石奇珍阁 (Outer Ring 3-4 Octagonal Jade & Mineral Curio Gallery)
+export function buildBaguaCurioGalleryBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "太古灵石奇珍阁",
+      description:
+        "艮东北外坊的玉石珍宝展馆，重檐青瓷顶下陈列昆仑寒玉与八卦晶矿，阁顶悬一尊缓旋灵晶。",
+      category: "building",
+      scaleClass: "large",
+      palette: {
+        stoneLight: "#cbd0d6",
+        qingBrick: "#4b5561",
+        jadeRoof: "#2a7b72",
+        gold: "#ebb93c",
+        crystalCyan: "#66f0e8",
+        lanternGlow: "#ffe296",
+        cinnabar: "#b5332a",
+      },
+      ops: [
+        { op: "cylinder", axis: "y", cx: 0, y0: 0, y1: 2, cz: 0, radius: 9.8, color: "stoneLight" },
+        { op: "stairs", x0: -3, y0: 0, z0: 8, steps: 2, width: 6, dir: "+z", color: "stoneLight" },
+        { op: "hollowBox", x0: -7, y0: 2, z0: -7, x1: 7, y1: 11, z1: 7, wall: 1, color: "qingBrick", trim: "gold" },
+        { op: "arch", cx: 0, y0: 2, cz: 6, halfSpan: 2, height: 6, depth: 2, axis: "z", color: "cinnabar" },
+        { op: "box", x0: 4, y0: 5, z0: 6, x1: 6, y1: 8, z1: 7, color: "crystalCyan", emit: 1.0, mirrorX: true },
+        { op: "roofPyramid", x0: -9, yBase: 11, z0: -9, x1: 9, z1: 9, color: "jadeRoof", trim: "gold" },
+        { op: "cylinder", axis: "y", cx: 0, y0: 15, y1: 18, cz: 0, radius: 0.7, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "curio-jade-crystal",
+          kind: "spinY",
+          speed: 0.8,
+          pivot: [0, 21.0, 0],
+          ops: [
+            { op: "cone", cx: 0, y0: 0, y1: 2.5, cz: 0, rBottom: 1.5, rTop: 0.3, color: "crystalCyan", emit: 1.2 },
+            { op: "cone", cx: 0, y0: -2.5, y1: 0, cz: 0, rBottom: 0.3, rTop: 1.5, color: "gold", emit: 0.7 },
+          ],
+        },
+      ],
+    },
+    "太古灵石奇珍阁",
+  );
+}
+
+// 13l. 离火八卦点星台 (Outer Ring 3-4 Interactive Lights-Out Star Constellation Puzzle)
+export function buildBaguaLightsOutAltarBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "离火八卦点星台",
+      description:
+        "离南外坊的九宫星图石坛，点按符石连携翻转明暗，点亮全部九枚星符即可唤醒黄金天枢。",
+      category: "prop",
+      scaleClass: "medium",
+      interaction: { kind: "lights_out" },
+      palette: {
+        basalt: "#3c434f",
+        qingStone: "#8d9399",
+        cinnabar: "#c2342b",
+        gold: "#ebb93c",
+        ember: "#ff723b",
+      },
+      ops: [
+        { op: "box", x0: -7, y0: 0, z0: -7, x1: 7, y1: 1, z1: 7, color: "basalt" },
+        { op: "box", x0: -5, y0: 1, z0: -5, x1: 5, y1: 3, z1: 5, color: "qingStone" },
+        { op: "box", x0: -7, y0: 0, z0: -7, x1: -6, y1: 4, z1: -6, color: "cinnabar", mirrorX: true },
+        { op: "box", x0: -7, y0: 4, z0: -7, x1: -6, y1: 5, z1: -6, color: "ember", emit: 1.1, mirrorX: true },
+        { op: "box", x0: -7, y0: 0, z0: 6, x1: -6, y1: 4, z1: 7, color: "cinnabar", mirrorX: true },
+        { op: "box", x0: -7, y0: 4, z0: 6, x1: -6, y1: 5, z1: 7, color: "gold", emit: 0.6, mirrorX: true },
+      ],
+      parts: [],
+    },
+    "离火八卦点星台",
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
+// 13m. 天风望海灯楼 (Outer Ring 3-4 West Coastal Beacon Tower)
+export function buildBaguaLighthouseBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "天风望海灯楼",
+      description:
+        "兑西外坊遥望主岛海峡的八角望海灯楼，朱漆重檐悬着旋照苍穹的航标明灯与青铜风标。",
+      category: "building",
+      scaleClass: "large",
+      palette: {
+        qingStone: "#8c939b",
+        plaster: "#f3ece0",
+        cinnabar: "#c2342b",
+        azureTile: "#285f7f",
+        timber: "#6e4024",
+        gold: "#ebb93c",
+        beaconCyan: "#64f0ff",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "cylinder", axis: "y", cx: 0, y0: 0, y1: 2, cz: 0, radius: 9.2, color: "qingStone" },
+        { op: "stairs", x0: -3, y0: 0, z0: 8, steps: 2, width: 6, dir: "+z", color: "qingStone" },
+        { op: "hollowBox", x0: -6, y0: 2, z0: -6, x1: 6, y1: 10, z1: 6, wall: 1, color: "plaster", trim: "cinnabar" },
+        { op: "arch", cx: 0, y0: 2, cz: 5, halfSpan: 2, height: 6, depth: 2, axis: "z", color: "cinnabar" },
+        { op: "ring", axis: "y", cx: 0, y0: 9, y1: 10, cz: 0, outerR: 8.6, innerR: 6.2, color: "azureTile" },
+        { op: "hollowBox", x0: -5, y0: 10, z0: -5, x1: 5, y1: 17, z1: 5, wall: 1, color: "cinnabar", trim: "gold" },
+        { op: "box", x0: -3, y0: 12, z0: 4, x1: 3, y1: 15, z1: 5, color: "lanternGlow", emit: 0.95 },
+        { op: "ring", axis: "y", cx: 0, y0: 16, y1: 17, cz: 0, outerR: 7.4, innerR: 5.0, color: "azureTile" },
+        // Lantern watch gallery
+        { op: "hollowBox", x0: -3, y0: 17, z0: -3, x1: 3, y1: 22, z1: 3, wall: 1, color: "timber", trim: "gold" },
+        { op: "box", x0: -2, y0: 18, z0: -2, x1: 2, y1: 21, z1: 2, color: "beaconCyan", emit: 1.35 },
+        { op: "roofPyramid", x0: -5, yBase: 22, z0: -5, x1: 5, z1: 5, color: "azureTile", trim: "gold" },
+        { op: "cylinder", axis: "y", cx: 0, y0: 25, y1: 27, cz: 0, radius: 0.5, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "lighthouse-beacon-vane",
+          kind: "spinY",
+          speed: 0.95,
+          pivot: [0, 28.5, 0],
+          ops: [
+            { op: "ring", axis: "y", cx: 0, y0: 0, y1: 1, cz: 0, outerR: 2.8, innerR: 2.0, color: "gold", emit: 0.7 },
+            { op: "box", x0: -4, y0: 0, z0: 0, x1: 4, y1: 1, z1: 1, color: "beaconCyan", emit: 1.2 },
+          ],
+        },
+      ],
+    },
+    "天风望海灯楼",
+  );
+}
+
+// 13n. 八卦凌霄文塔 (Outer Ring 3-4 Northwest 5-Tier Sichuan Pagoda)
+export function buildBaguaPagodaBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "八卦凌霄文塔",
+      description:
+        "乾西北外坊五重飞檐八角文峰古塔，青砖黛瓦逐层收分耸立云端，为八卦城西北天际制高点。",
+      category: "building",
+      scaleClass: "large",
+      palette: {
+        qingStone: "#8d9399",
+        qingBrick: "#4e5662",
+        plaster: "#f2ebe0",
+        daiTile: "#28303b",
+        cinnabar: "#b5332a",
+        gold: "#ebb93c",
+        lanternGlow: "#ffe296",
+        jadeAccent: "#4de3c8",
+      },
+      ops: [
+        { op: "cylinder", axis: "y", cx: 0, y0: 0, y1: 2, cz: 0, radius: 9.6, color: "qingStone" },
+        { op: "stairs", x0: -3, y0: 0, z0: 8, steps: 2, width: 6, dir: "+z", color: "qingStone" },
+        // Tier 1
+        { op: "hollowBox", x0: -6, y0: 2, z0: -6, x1: 6, y1: 9, z1: 6, wall: 1, color: "qingBrick", trim: "cinnabar" },
+        { op: "arch", cx: 0, y0: 2, cz: 5, halfSpan: 2, height: 5, depth: 2, axis: "z", color: "cinnabar" },
+        { op: "ring", axis: "y", cx: 0, y0: 8, y1: 9, cz: 0, outerR: 8.8, innerR: 6.0, color: "daiTile" },
+        // Tier 2
+        { op: "hollowBox", x0: -5, y0: 9, z0: -5, x1: 5, y1: 15, z1: 5, wall: 1, color: "plaster", trim: "cinnabar" },
+        { op: "box", x0: -2, y0: 11, z0: 4, x1: 2, y1: 13, z1: 5, color: "lanternGlow", emit: 0.9 },
+        { op: "ring", axis: "y", cx: 0, y0: 14, y1: 15, cz: 0, outerR: 7.4, innerR: 4.8, color: "daiTile" },
+        // Tier 3
+        { op: "hollowBox", x0: -4, y0: 15, z0: -4, x1: 4, y1: 20, z1: 4, wall: 1, color: "plaster", trim: "gold" },
+        { op: "ring", axis: "y", cx: 0, y0: 19, y1: 20, cz: 0, outerR: 6.2, innerR: 3.8, color: "daiTile" },
+        // Tier 4
+        { op: "box", x0: -3, y0: 20, z0: -3, x1: 3, y1: 24, z1: 3, color: "cinnabar" },
+        { op: "ring", axis: "y", cx: 0, y0: 23, y1: 24, cz: 0, outerR: 5.0, innerR: 2.8, color: "daiTile" },
+        // Tier 5 & Roof Spire
+        { op: "box", x0: -2, y0: 24, z0: -2, x1: 2, y1: 27, z1: 2, color: "lanternGlow", emit: 0.9 },
+        { op: "roofPyramid", x0: -4, yBase: 27, z0: -4, x1: 4, z1: 4, color: "daiTile", trim: "gold" },
+        { op: "cylinder", axis: "y", cx: 0, y0: 30, y1: 33, cz: 0, radius: 0.5, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "pagoda-sky-halo",
+          kind: "spinY",
+          speed: 0.65,
+          pivot: [0, 34.0, 0],
+          ops: [
+            { op: "ring", axis: "y", cx: 0, y0: 0, y1: 1, cz: 0, outerR: 2.2, innerR: 1.5, color: "gold", emit: 0.8 },
+            { op: "sphere", cx: 0, cy: 0.5, cz: 0, rx: 0.9, ry: 0.9, rz: 0.9, color: "jadeAccent", emit: 1.15 },
+          ],
+        },
+      ],
+    },
+    "八卦凌霄文塔",
+  );
+}
+
+// 13o. 保宁醋染水轩 (Outer Ring 3-4 North Langzhong Vinegar & Indigo Dye Workshop)
+export function buildBaguaDyehouseBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "保宁醋染水轩",
+      description:
+        "坎北外坊传承阆中非遗的古法酿醋与青蓝扎染水工坊，檐下陈列陶土醋坛并高悬随风轻扬的靛蓝染布。",
+      category: "building",
+      scaleClass: "large",
+      palette: {
+        qingStone: "#8d9399",
+        qingBrick: "#4b545f",
+        plaster: "#ede6d8",
+        timber: "#6e4024",
+        daiTile: "#28303b",
+        indigoCloth: "#2b5ba8",
+        tealCloth: "#38a39c",
+        vinegarJar: "#5a3926",
+        gold: "#ebb93c",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "box", x0: -10, y0: 0, z0: -8, x1: 10, y1: 1, z1: 8, color: "qingStone" },
+        { op: "stairs", x0: -3, y0: 0, z0: 8, steps: 1, width: 6, dir: "+z", color: "qingStone" },
+        { op: "hollowBox", x0: -8, y0: 1, z0: -6, x1: 8, y1: 10, z1: 3, wall: 1, color: "qingBrick", trim: "timber" },
+        { op: "arch", cx: 0, y0: 1, cz: 2, halfSpan: 2, height: 6, depth: 2, axis: "z", color: "timber" },
+        { op: "box", x0: 4, y0: 4, z0: 2, x1: 6, y1: 7, z1: 3, color: "lanternGlow", emit: 0.9, mirrorX: true },
+        { op: "roofGable", x0: -9, yBase: 10, z0: -7, x1: 9, z1: 4, rise: 5, axis: "x", color: "daiTile", trim: "gold" },
+        // Courtyard stone dye-drying timber frame + stoneware vinegar vats
+        { op: "box", x0: -8, y0: 1, z0: 5, x1: -7, y1: 9, z1: 6, color: "timber", mirrorX: true },
+        { op: "box", x0: -8, y0: 8, z0: 5, x1: 8, y1: 9, z1: 6, color: "timber" },
+        { op: "box", x0: -6, y0: 3, z0: 5, x1: -4, y1: 8, z1: 6, color: "indigoCloth" },
+        { op: "box", x0: 4, y0: 3, z0: 5, x1: 6, y1: 8, z1: 6, color: "tealCloth" },
+        { op: "cylinder", axis: "y", cx: -5, y0: 1, y1: 3, cz: 7, radius: 1.2, color: "vinegarJar" },
+        { op: "cylinder", axis: "y", cx: 5, y0: 1, y1: 3, cz: 7, radius: 1.2, color: "vinegarJar" },
+      ],
+      parts: [
+        {
+          name: "dyehouse-hanging-cloth",
+          kind: "swingX",
+          speed: 1.4,
+          amp: 0.14,
+          pivot: [0, 8.2, 5.5],
+          ops: [
+            { op: "box", x0: -2, y0: -5, z0: 0, x1: 0, y1: 0, z1: 1, color: "indigoCloth" },
+            { op: "box", x0: 1, y0: -4, z0: 0, x1: 3, y1: 0, z1: 1, color: "tealCloth" },
+          ],
+        },
+      ],
+    },
+    "保宁醋染水轩",
+  );
+}
+
+// 13p. 川味红油担担面摊 (Outer Market Alley Street Food Stall)
+export function buildBaguaNoodleStallBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "川味红油担担面摊",
+      description:
+        "街坊巷口热气腾腾的川味红油担担面摊，紫铜汤锅正冒着白气，配一排条凳迎候往来食客。",
+      category: "prop",
+      scaleClass: "small",
+      palette: {
+        qingStone: "#8d9399",
+        timber: "#754626",
+        cinnabar: "#c2342b",
+        daiTile: "#28303b",
+        brass: "#e3b344",
+        lanternGlow: "#ffe296",
+        steamWhite: "#f7fafc",
+      },
+      ops: [
+        { op: "box", x0: -5, y0: 0, z0: -4, x1: 5, y1: 1, z1: 4, color: "qingStone" },
+        { op: "box", x0: 4, y0: 1, z0: -3, x1: 5, y1: 6, z1: -2, color: "timber", mirrorX: true },
+        { op: "box", x0: 4, y0: 1, z0: 2, x1: 5, y1: 6, z1: 3, color: "timber", mirrorX: true },
+        { op: "box", x0: -4, y0: 1, z0: -1, x1: 4, y1: 3, z1: 1, color: "cinnabar" },
+        { op: "cylinder", axis: "y", cx: 2, y0: 3, y1: 4, cz: 0, radius: 1.1, color: "brass" },
+        { op: "box", x0: -3, y0: 4, z0: 2, x1: -2, y1: 5, z1: 3, color: "lanternGlow", emit: 1.0, mirrorX: true },
+        { op: "box", x0: -3, y0: 1, z0: 2, x1: 3, y1: 2, z1: 3, color: "timber" },
+        { op: "roofGable", x0: -5, yBase: 6, z0: -4, x1: 5, z1: 4, rise: 2, axis: "x", color: "daiTile", trim: "cinnabar" },
+      ],
+      parts: [
+        {
+          name: "noodle-pot-steam",
+          kind: "bob",
+          speed: 2.2,
+          amp: 0.35,
+          pivot: [2, 5.2, 0],
+          ops: [
+            { op: "sphere", cx: 0, cy: 0, cz: 0, rx: 0.9, ry: 0.7, rz: 0.9, color: "steamWhite", emit: 0.25 },
+            { op: "sphere", cx: 0.3, cy: 0.9, cz: -0.2, rx: 0.6, ry: 0.5, rz: 0.6, color: "steamWhite", emit: 0.2 },
+          ],
+        },
+      ],
+    },
+    "川味红油担担面摊",
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
+// 13q. 川剧脸谱糖画坊 (Outer Market Alley Sichuan Opera Mask & Sugar Art Stall)
+export function buildBaguaOperaStallBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "川剧脸谱糖画坊",
+      description:
+        "彩绘川剧脸谱与金丝转盘糖画民俗摊棚，红金画幕两侧摆着铜锣与糖画大转盘，节日氛围十足。",
+      category: "prop",
+      scaleClass: "small",
+      palette: {
+        qingStone: "#8d9399",
+        timber: "#6e4024",
+        cinnabar: "#c9332b",
+        gold: "#ebb93c",
+        cyanMask: "#48cde6",
+        whiteMask: "#f5f4ef",
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "box", x0: -5, y0: 0, z0: -4, x1: 5, y1: 1, z1: 4, color: "qingStone" },
+        { op: "box", x0: 4, y0: 1, z0: -3, x1: 5, y1: 6, z1: -2, color: "cinnabar", mirrorX: true },
+        { op: "box", x0: 4, y0: 1, z0: 2, x1: 5, y1: 6, z1: 3, color: "cinnabar", mirrorX: true },
+        // Mask display board
+        { op: "box", x0: -4, y0: 2, z0: -3, x1: 4, y1: 5, z1: -2, color: "timber" },
+        { op: "put", x: -2, y: 4, z: -1, color: "cinnabar" },
+        { op: "put", x: 0, y: 4, z: -1, color: "gold" },
+        { op: "put", x: 2, y: 4, z: -1, color: "cyanMask" },
+        { op: "put", x: -1, y: 3, z: -1, color: "whiteMask" },
+        { op: "box", x0: -4, y0: 1, z0: 0, x1: 4, y1: 3, z1: 2, color: "timber" },
+        { op: "box", x0: -3, y0: 4, z0: 2, x1: -2, y1: 5, z1: 3, color: "lanternGlow", emit: 1.0, mirrorX: true },
+        { op: "roofGable", x0: -5, yBase: 6, z0: -4, x1: 5, z1: 4, rise: 2, axis: "x", color: "cinnabar", trim: "gold" },
+      ],
+      parts: [
+        {
+          name: "sugar-art-turntable",
+          kind: "spinY",
+          speed: 1.2,
+          pivot: [0, 3.6, 1],
+          ops: [
+            { op: "cylinder", axis: "y", cx: 0, y0: 0, y1: 0.4, cz: 0, radius: 1.3, color: "gold", emit: 0.4 },
+            { op: "put", x: 1, y: 1, z: 0, color: "cinnabar" },
+          ],
+        },
+      ],
+    },
+    "川剧脸谱糖画坊",
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
+// 13r. 东震观澜听涛台 / 兑泽望岛栈桥亭 (Coastal Cliff Timber Viewing Pier & Pavilion)
+export function buildBaguaShorePierBlueprint(name: string, desc: string, accentHex: string): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name,
+      description: desc,
+      category: "prop",
+      scaleClass: "medium",
+      palette: {
+        qingStone: "#8d9399",
+        timber: "#7a4d2a",
+        timberLight: "#a67042",
+        daiTile: "#28303b",
+        gold: "#ebb93c",
+        accent: accentHex,
+        lanternGlow: "#ffe296",
+      },
+      ops: [
+        { op: "box", x0: -7, y0: 0, z0: -7, x1: 7, y1: 1, z1: 7, color: "qingStone" },
+        { op: "box", x0: -6, y0: 1, z0: -6, x1: 6, y1: 2, z1: 6, color: "timberLight" },
+        // Timber railings around outer edge (leaving -z open for path entry)
+        { op: "box", x0: -6, y0: 2, z0: 5, x1: 6, y1: 4, z1: 6, color: "timber" },
+        { op: "box", x0: 5, y0: 2, z0: -5, x1: 6, y1: 4, z1: 5, color: "timber", mirrorX: true },
+        // Pavilion columns & roof over rear center
+        { op: "box", x0: 4, y0: 2, z0: -4, x1: 5, y1: 8, z1: -3, color: "timber", mirrorX: true },
+        { op: "box", x0: 4, y0: 2, z0: 2, x1: 5, y1: 8, z1: 3, color: "timber", mirrorX: true },
+        { op: "box", x0: -3, y0: 2, z0: 1, x1: 3, y1: 3, z1: 2, color: "timberLight" },
+        { op: "box", x0: 5, y0: 4, z0: 5, x1: 6, y1: 6, z1: 6, color: "lanternGlow", emit: 1.0, mirrorX: true },
+        { op: "roofPyramid", x0: -6, yBase: 8, z0: -5, x1: 6, z1: 4, color: "daiTile", trim: "gold" },
+        { op: "put", x: 0, y: 11, z: 0, color: "accent", emit: 0.9 },
+      ],
+      parts: [],
+    },
+    name,
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
+// 13s. 八卦城志铜钟日晷亭 (Central Taiji Plaza Sundial & Memorial Stele)
+export function buildBaguaSundialSteleBlueprint(): VoxelBlueprint {
+  return normalizeAndGroundBlueprint(
+    {
+      name: "八卦城志铜钟日晷亭",
+      description:
+        "矗立于太极广场东侧的石雕日晷与青铜铭文碑亭，镌刻八卦古城四环建制与周天节气刻度。",
+      category: "prop",
+      scaleClass: "small",
+      palette: {
+        qingStone: "#8d9399",
+        stoneLight: "#cfd3d8",
+        tealSlate: "#2d5d63",
+        cinnabar: "#b5332a",
+        gold: "#ebb93c",
+        bronze: "#8f6c38",
+      },
+      ops: [
+        { op: "cylinder", axis: "y", cx: 0, y0: 0, y1: 1, cz: 0, radius: 4.2, color: "qingStone" },
+        { op: "cylinder", axis: "y", cx: 0, y0: 1, y1: 2, cz: 0, radius: 3.0, color: "stoneLight" },
+        { op: "box", x0: -1, y0: 2, z0: -1, x1: 1, y1: 7, z1: 1, color: "tealSlate" },
+        { op: "box", x0: -2, y0: 2, z0: 0, x1: 2, y1: 7, z1: 1, color: "cinnabar", mirrorX: true },
+        { op: "box", x0: -3, y0: 7, z0: -2, x1: 3, y1: 8, z1: 2, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "taiji-sundial-ring",
+          kind: "spinY",
+          speed: 0.35,
+          pivot: [0, 9.2, 0],
+          ops: [
+            { op: "ring", axis: "y", cx: 0, y0: 0, y1: 1, cz: 0, outerR: 1.9, innerR: 1.2, color: "gold", emit: 0.65 },
+            { op: "box", x0: 0, y0: 0, z0: -1, x1: 1, y1: 2, z1: 1, color: "bronze" },
+          ],
+        },
+      ],
+    },
+    "八卦城志铜钟日晷亭",
+    { keepPlinth: false, skipAutoRepair: true },
+  );
+}
+
 export function ensureBaguaIsland(state: {
   creations: WorldCreation[];
   paths: WorldPath[];
@@ -1248,6 +2147,242 @@ export function ensureBaguaIsland(state: {
     });
   });
 
+  // Ring 1-2 Inner Ward Commercial, Cultural & Interactive Courtyards (r = 58.8m, facing outward toward Ring 2)
+  const innerWardSpec = (angle: number) => {
+    const [x, z] = radialPt(angle, 58.8);
+    const yaw = Number(Math.atan2(x - CX, z).toFixed(4));
+    return { x, z, yaw };
+  };
+  const innerKunPos = innerWardSpec((3 * Math.PI) / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.innerTeahouse,
+    ...innerKunPos,
+    builder: buildBaguaTeahouseBlueprint,
+    activity: "二环坊市煮茶待客",
+    statusLine: "川西盖碗茶香飘溢二环，竹廊红灯迎接八方来客",
+    createdAtOffset: 1010,
+  });
+
+  const innerLiPos = innerWardSpec(Math.PI / 2 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.innerSilkshop,
+    ...innerLiPos,
+    builder: buildBaguaSilkShopBlueprint,
+    activity: "蜀锦刺绣坊市呈祥",
+    statusLine: "五彩蜀锦与灯彩垂挂檐前，织就川西八卦城流光",
+    createdAtOffset: 1020,
+  });
+
+  const innerXunPos = innerWardSpec(Math.PI / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.innerGuqin,
+    ...innerXunPos,
+    builder: buildBaguaGuqinDeckBlueprint,
+    activity: "流觞丝竹古琴奏鸣",
+    statusLine: "踏上八枚玉键或按 E 弹奏古韵五声清音",
+    createdAtOffset: 1030,
+  });
+
+  const innerZhenPos = innerWardSpec(0 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.innerApothecary,
+    ...innerZhenPos,
+    builder: buildBaguaApothecaryBlueprint,
+    activity: "青囊百草堂制药香",
+    statusLine: "苍翠药圃围绕医馆，翡翠药葫芦悬于檐顶",
+    createdAtOffset: 1040,
+  });
+
+  const innerGenPos = innerWardSpec(-Math.PI / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.innerChess,
+    ...innerGenPos,
+    builder: buildBaguaChessCourtBlueprint,
+    activity: "九宫石台对弈切磋",
+    statusLine: "艮山内坊青石弈台，可点按九宫棋格与棋灵对弈",
+    createdAtOffset: 1050,
+  });
+
+  const innerKanPos = innerWardSpec(-Math.PI / 2 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.innerAstrology,
+    ...innerKanPos,
+    builder: buildBaguaAstrologyBlueprint,
+    activity: "天机星盘推演周天",
+    statusLine: "坎北内坊星象算馆，琉璃顶上星盘流转不息",
+    createdAtOffset: 1060,
+  });
+
+  const innerQianPos = innerWardSpec((-3 * Math.PI) / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.innerBookstore,
+    ...innerQianPos,
+    builder: buildBaguaBookstoreBlueprint,
+    activity: "阆中墨香品读典籍",
+    statusLine: "青砖书斋书香盈院，展藏八卦古籍与蜀中诗画",
+    createdAtOffset: 1070,
+  });
+
+  // Ring 3-4 Outer Craft, Culinary & Gallery Ward (r = 155.5m, facing inward toward Ring 3)
+  const outerWardSpec = (angle: number) => {
+    const [x, z] = radialPt(angle, 155.5);
+    const yaw = Number(Math.atan2(CX - x, -z).toFixed(4));
+    return { x, z, yaw };
+  };
+  const outerZhenPos = outerWardSpec(0 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerForge,
+    ...outerZhenPos,
+    builder: buildBaguaForgeBlueprint,
+    activity: "红炉铸剑铜钟试鸣",
+    statusLine: "震东外坊铁匠工坊，炉火明灭间砂轮飞转砥砺神兵",
+    createdAtOffset: 1110,
+  });
+
+  const outerXunPos = outerWardSpec(Math.PI / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerTavern,
+    ...outerXunPos,
+    builder: buildBaguaTavernBlueprint,
+    activity: "醉仙酒肆灯火迎宾",
+    statusLine: "三环外坊朱漆二层川味酒肆，酒旗摇曳夜色温暖",
+    createdAtOffset: 1120,
+  });
+
+  const outerLiPos = outerWardSpec(Math.PI / 2 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerLightsOut,
+    ...outerLiPos,
+    builder: buildBaguaLightsOutAltarBlueprint,
+    activity: "离火九宫点星启阵",
+    statusLine: "可点击九宫符石或按 E 切换星辉，全亮唤醒天枢金芒",
+    createdAtOffset: 1130,
+  });
+
+  const outerKunPos = outerWardSpec((3 * Math.PI) / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerInn,
+    ...outerKunPos,
+    builder: buildBaguaInnBlueprint,
+    activity: "悦来客栈旅人小憩",
+    statusLine: "川西马头墙木构客栈，开门迎接远赴八卦城之客",
+    createdAtOffset: 1140,
+  });
+
+  const outerGenPos = outerWardSpec(-Math.PI / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerCurio,
+    ...outerGenPos,
+    builder: buildBaguaCurioGalleryBlueprint,
+    activity: "灵石奇珍阁观玉赏矿",
+    statusLine: "艮北外坊青瓷穹顶展馆，陈列蓬莱寒玉与八卦晶矿",
+    createdAtOffset: 1150,
+  });
+
+  const outerDuiPos = outerWardSpec(Math.PI + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerLighthouse,
+    ...outerDuiPos,
+    builder: buildBaguaLighthouseBlueprint,
+    activity: "望海灯楼巡航守望",
+    statusLine: "兑西外坊八角航标灯楼，明灯苍穹遥迎主岛归客",
+    createdAtOffset: 1160,
+  });
+
+  const outerQianPos = outerWardSpec((-3 * Math.PI) / 4 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerPagoda,
+    ...outerQianPos,
+    builder: buildBaguaPagodaBlueprint,
+    activity: "凌霄文塔登高望远",
+    statusLine: "乾西北外坊五重飞檐古塔，俯瞰四环八门与海天一色",
+    createdAtOffset: 1170,
+  });
+
+  const outerKanPos = outerWardSpec(-Math.PI / 2 + WEDGE_OFFSET);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.outerDyehouse,
+    ...outerKanPos,
+    builder: buildBaguaDyehouseBlueprint,
+    activity: "古法酿醋青蓝扎染",
+    statusLine: "坎北外坊保宁醋染水轩，青布随风轻摆、醋香醇厚",
+    createdAtOffset: 1180,
+  });
+
+  // Ring 3-4 Market Flank Street Stalls (r = 146.5m, ±0.19 rad off sector centers)
+  const marketNoodleAngle = Math.PI / 4 + WEDGE_OFFSET - 0.19;
+  const [mnX, mnZ] = radialPt(marketNoodleAngle, 146.5);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.marketNoodles,
+    x: mnX,
+    z: mnZ,
+    yaw: Number(Math.atan2(CX - mnX, -mnZ).toFixed(4)),
+    builder: buildBaguaNoodleStallBlueprint,
+    activity: "担担面摊煮面飘香",
+    statusLine: "巽位醉仙酒肆街角食摊，热气腾腾一碗地道川味担担面",
+    createdAtOffset: 1210,
+  });
+
+  const marketOperaAngle = Math.PI / 2 + WEDGE_OFFSET + 0.19;
+  const [moX, moZ] = radialPt(marketOperaAngle, 146.5);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.marketOpera,
+    x: moX,
+    z: moZ,
+    yaw: Number(Math.atan2(CX - moX, -moZ).toFixed(4)),
+    builder: buildBaguaOperaStallBlueprint,
+    activity: "川剧脸谱画糖迎客",
+    statusLine: "离南外坊彩绘川剧脸谱与金丝转盘糖画民俗摊坊",
+    createdAtOffset: 1220,
+  });
+
+  // Central Taiji East Axis Sundial & Memorial Stele
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.courtyardStele,
+    x: CX + 26.8,
+    z: 0,
+    yaw: Number((-Math.PI / 2).toFixed(4)),
+    builder: buildBaguaSundialSteleBlueprint,
+    activity: "观测日晷八卦古碑",
+    statusLine: "太极广场东侧石雕日晷铜钟碑亭，镌刻八卦建城仪制",
+    createdAtOffset: 1230,
+  });
+
+  // Ring 4 Outer Coastal Cliff Viewing Piers (r = 224m along East & West sector midlines)
+  const [pierEX, pierEZ] = radialPt(0 + WEDGE_OFFSET, 224.0);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.shorePierE,
+    x: pierEX,
+    z: pierEZ,
+    yaw: Number((0 + WEDGE_OFFSET - Math.PI / 2).toFixed(4)),
+    builder: () =>
+      buildBaguaShorePierBlueprint(
+        "东震观澜听涛台",
+        "东门外海崖悬挑木质观澜平台，迎旭日东升与大鹏掠海，观东海白沫涛声。",
+        "#46e87a",
+      ),
+    activity: "临海观澜听涛赏景",
+    statusLine: "八卦城东崖木栈观景台，适合远眺大海与等待大鹏掠空",
+    createdAtOffset: 1240,
+  });
+
+  const [pierWX, pierWZ] = radialPt(Math.PI + WEDGE_OFFSET, 224.0);
+  ensureCreation({
+    id: BAGUA_CREATION_IDS.shorePierW,
+    x: pierWX,
+    z: pierWZ,
+    yaw: Number((Math.PI + WEDGE_OFFSET - Math.PI / 2).toFixed(4)),
+    builder: () =>
+      buildBaguaShorePierBlueprint(
+        "兑泽望岛栈桥亭",
+        "西岸海崖飞檐观海木亭，隔碧蓝海峡遥望主岛灯火与群帆。",
+        "#64dcff",
+      ),
+    activity: "隔海遥望主岛风物",
+    statusLine: "八卦城西崖临海栈桥木亭，可将西侧海峡风光尽收眼底",
+    createdAtOffset: 1250,
+  });
+
   // Prune retired bridge approach paths, legacy stub paths, and any inner-ring radial0 stubs if loaded from a persisted snapshot
   const obsoleteIds = [
     "path-bridge-west-approach",
@@ -1382,7 +2517,53 @@ export function ensureBaguaIsland(state: {
         radialPt(sectorAngle, 95.1),
       ],
     });
+    // Orthogonal cobblestone spur linking Ring 1-2 inner ward buildings straight to Ring 2 inner curb
+    if (rdef.dir !== "w") {
+      ensurePath({
+        id: `path-bagua-inner-spur-${rdef.dir}`,
+        kind: "cobblestone",
+        linear: true,
+        points: [
+          radialPt(sectorAngle, 64.5),
+          radialPt(sectorAngle, Number((RING2_APOTHEM - 3.7).toFixed(1))),
+        ],
+      });
+    }
+    // Orthogonal cobblestone spur linking Ring 3-4 outer craft/tavern ward buildings straight to Ring 3 outer curb
+    if (BAGUA_OUTER_SPUR_DIRS.includes(rdef.dir as (typeof BAGUA_OUTER_SPUR_DIRS)[number])) {
+      const RING3_APOTHEM = 140.14 * Math.cos(WEDGE_OFFSET); // ~129.47m
+      ensurePath({
+        id: `path-bagua-outer-spur-${rdef.dir}`,
+        kind: "cobblestone",
+        linear: true,
+        points: [
+          radialPt(sectorAngle, Number((RING3_APOTHEM + 3.7).toFixed(1))),
+          radialPt(sectorAngle, 148.5),
+        ],
+      });
+    }
   }
+
+  // Coastal cliff wooden pier approaches extending cleanly from Ring 4 outer curb (r = 183.4 -> 216.0)
+  const RING4_APOTHEM = 194.48 * Math.cos(WEDGE_OFFSET); // ~179.67m
+  ensurePath({
+    id: "path-bagua-shore-e",
+    kind: "cobblestone",
+    linear: true,
+    points: [
+      radialPt(0 + WEDGE_OFFSET, Number((RING4_APOTHEM + 3.7).toFixed(1))),
+      radialPt(0 + WEDGE_OFFSET, 216.5),
+    ],
+  });
+  ensurePath({
+    id: "path-bagua-shore-w",
+    kind: "cobblestone",
+    linear: true,
+    points: [
+      radialPt(Math.PI + WEDGE_OFFSET, Number((RING4_APOTHEM + 3.7).toFixed(1))),
+      radialPt(Math.PI + WEDGE_OFFSET, 216.5),
+    ],
+  });
 
   // 3. Bagua Island Terrain Zones (Stone Taiji Plaza + Biome Gardens)
   const ensureZone = (z: WorldTerrainZone) => {
@@ -1465,6 +2646,62 @@ export function ensureBaguaIsland(state: {
     x: duiPos.x,
     z: duiPos.z,
     radius: 19.5,
+  });
+  ensureZone({
+    id: "zone-bagua-inner-teahouse-plaza",
+    biome: "stone_plaza",
+    x: innerKunPos.x,
+    z: innerKunPos.z,
+    radius: 11.5,
+  });
+  ensureZone({
+    id: "zone-bagua-inner-silk-plaza",
+    biome: "autumn_grove",
+    x: innerLiPos.x,
+    z: innerLiPos.z,
+    radius: 11.5,
+  });
+  ensureZone({
+    id: "zone-bagua-inner-herb-moss",
+    biome: "misty_moss",
+    x: innerZhenPos.x,
+    z: innerZhenPos.z,
+    radius: 11.5,
+  });
+  ensureZone({
+    id: "zone-bagua-outer-tavern-plaza",
+    biome: "stone_plaza",
+    x: outerXunPos.x,
+    z: outerXunPos.z,
+    radius: 15.5,
+  });
+  ensureZone({
+    id: "zone-bagua-outer-inn-clover",
+    biome: "meadow_clover",
+    x: outerKunPos.x,
+    z: outerKunPos.z,
+    radius: 15.0,
+  });
+  ensureZone({
+    id: "zone-bagua-outer-lighthouse-plaza",
+    biome: "stone_plaza",
+    x: outerDuiPos.x,
+    z: outerDuiPos.z,
+    radius: 15.0,
+  });
+  ensureZone({
+    id: "zone-bagua-outer-pagoda-grove",
+    biome: "autumn_grove",
+    x: outerQianPos.x,
+    z: outerQianPos.z,
+    radius: 15.5,
+  });
+  ensureZone({
+    id: "zone-bagua-outer-dyehouse-moss",
+    biome: "misty_moss",
+    x: outerKanPos.x,
+    z: outerKanPos.z,
+    radius: 15.0,
   });
 
   // 4. Scenic Props (Signs, Lotus Pond, Courtyard Lanterns, Benches)
@@ -1611,6 +2848,74 @@ export function ensureBaguaIsland(state: {
     z: -62.5,
     yaw: Math.PI / 2,
   });
+
+  // Ring-4 outer corner lanterns, market benches, garden blossoms & tree clusters
+  const [lr4neX, lr4neZ] = radialPt(-Math.PI / 4 + WEDGE_OFFSET, 171.5);
+  const [lr4seX, lr4seZ] = radialPt(Math.PI / 4 + WEDGE_OFFSET, 171.5);
+  const [lr4swX, lr4swZ] = radialPt((3 * Math.PI) / 4 + WEDGE_OFFSET, 171.5);
+  const [lr4nwX, lr4nwZ] = radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET, 171.5);
+  ensureProp({ id: "prop-bagua-lantern-ring4-ne", kind: "lamp_post", x: lr4neX, z: lr4neZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-lantern-ring4-se", kind: "lamp_post", x: lr4seX, z: lr4seZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-lantern-ring4-sw", kind: "lamp_post", x: lr4swX, z: lr4swZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-lantern-ring4-nw", kind: "lamp_post", x: lr4nwX, z: lr4nwZ, yaw: 0 });
+
+  const [boseX, boseZ] = radialPt(Math.PI / 4 + WEDGE_OFFSET + 0.08, 144.0);
+  const [boswX, boswZ] = radialPt((3 * Math.PI) / 4 + WEDGE_OFFSET - 0.08, 144.0);
+  ensureProp({
+    id: "prop-bagua-bench-outer-se",
+    kind: "bench",
+    x: boseX,
+    z: boseZ,
+    yaw: Number((Math.PI / 4 + WEDGE_OFFSET + Math.PI).toFixed(3)),
+  });
+  ensureProp({
+    id: "prop-bagua-bench-outer-sw",
+    kind: "bench",
+    x: boswX,
+    z: boswZ,
+    yaw: Number(((3 * Math.PI) / 4 + WEDGE_OFFSET + Math.PI).toFixed(3)),
+  });
+
+  const [flDuiX, flDuiZ] = radialPt(-Math.PI + WEDGE_OFFSET - 0.14, 65.5);
+  const [flTaiN_X, flTaiN_Z] = radialPt(-Math.PI / 2 + WEDGE_OFFSET, 30.8);
+  const [flTaiS_X, flTaiS_Z] = radialPt(Math.PI / 2 + WEDGE_OFFSET, 30.8);
+  ensureProp({ id: "prop-bagua-flower-dui", kind: "flower_patch", x: flDuiX, z: flDuiZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-flower-taiji-n", kind: "flower_patch", x: flTaiN_X, z: flTaiN_Z, yaw: 0 });
+  ensureProp({ id: "prop-bagua-flower-taiji-s", kind: "flower_patch", x: flTaiS_X, z: flTaiS_Z, yaw: 0 });
+
+  const [trInNeX, trInNeZ] = radialPt(-Math.PI / 4 + WEDGE_OFFSET + 0.16, 61.5);
+  const [trInSeX, trInSeZ] = radialPt(Math.PI / 4 + WEDGE_OFFSET - 0.16, 61.5);
+  const [trOutNeX, trOutNeZ] = radialPt(-Math.PI / 4 + WEDGE_OFFSET - 0.14, 158.0);
+  const [trOutSwX, trOutSwZ] = radialPt((3 * Math.PI) / 4 + WEDGE_OFFSET + 0.14, 158.0);
+  const [trOutNwX, trOutNwZ] = radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET + 0.15, 160.0);
+  const [trOutNX, trOutNZ] = radialPt(-Math.PI / 2 + WEDGE_OFFSET - 0.15, 160.0);
+  ensureProp({ id: "prop-bagua-tree-inner-ne", kind: "tree_cluster", x: trInNeX, z: trInNeZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-tree-inner-se", kind: "tree_cluster", x: trInSeX, z: trInSeZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-tree-outer-ne", kind: "tree_cluster", x: trOutNeX, z: trOutNeZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-tree-outer-sw", kind: "tree_cluster", x: trOutSwX, z: trOutSwZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-tree-outer-nw", kind: "tree_cluster", x: trOutNwX, z: trOutNwZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-tree-outer-n", kind: "tree_cluster", x: trOutNX, z: trOutNZ, yaw: 0 });
+
+  const [bowX, bowZ] = radialPt(Math.PI + WEDGE_OFFSET + 0.08, 144.0);
+  const [bonX, bonZ] = radialPt(-Math.PI / 2 + WEDGE_OFFSET + 0.08, 144.0);
+  ensureProp({
+    id: "prop-bagua-bench-outer-w",
+    kind: "bench",
+    x: bowX,
+    z: bowZ,
+    yaw: Number((Math.PI + WEDGE_OFFSET + Math.PI).toFixed(3)),
+  });
+  ensureProp({
+    id: "prop-bagua-bench-outer-n",
+    kind: "bench",
+    x: bonX,
+    z: bonZ,
+    yaw: Number((-Math.PI / 2 + WEDGE_OFFSET + Math.PI).toFixed(3)),
+  });
+  const [flOutWX, flOutWZ] = radialPt(Math.PI + WEDGE_OFFSET - 0.14, 152.0);
+  const [flOutNwX, flOutNwZ] = radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET - 0.14, 152.0);
+  ensureProp({ id: "prop-bagua-flower-outer-w", kind: "flower_patch", x: flOutWX, z: flOutWZ, yaw: 0 });
+  ensureProp({ id: "prop-bagua-flower-outer-nw", kind: "flower_patch", x: flOutNwX, z: flOutNwZ, yaw: 0 });
 
   // Ring-2 Octagonal Sightseeing Loop Stations (3 stations balanced cleanly around Ring 2)
   const stopDuiPos = radialPt(-Math.PI + WEDGE_OFFSET, Number(RING2_APOTHEM.toFixed(2)));
@@ -1838,6 +3143,178 @@ export function ensureBaguaIsland(state: {
       [CX + 4, 48],
       [CX + 44, 34],
       [CX - 38, 42],
+    ],
+    usesTransit: false,
+  });
+
+  // Bagua City Interactive Specialty NPCs (Taiji Keeper, Teahouse Host, Herbalist, Scholar, Blacksmith, Innkeeper)
+  ensureVillager({
+    id: "villager-bagua-daoist",
+    name: "天机道长",
+    role: "explorer",
+    hatColor: "#f4be3b",
+    shirtColor: "#265a78",
+    homeX: CX - 22.5,
+    homeZ: 14.5,
+    stops: [
+      [CX - 22.5, 14.5],
+      [CX + 22.5, 14.5],
+      [CX + 22.5, -14.5],
+      [CX - 22.5, -14.5],
+    ],
+    usesTransit: false,
+  });
+
+  const teaFront = radialPt((3 * Math.PI) / 4 + WEDGE_OFFSET, 66.5);
+  const teaSide = radialPt((3 * Math.PI) / 4 + WEDGE_OFFSET + 0.09, 68.5);
+  ensureVillager({
+    id: "villager-bagua-tea",
+    name: "沈茶娘",
+    role: "baker",
+    hatColor: "#5ec4a8",
+    shirtColor: "#c95d4c",
+    homeX: teaFront[0],
+    homeZ: teaFront[1],
+    stops: [
+      teaFront,
+      teaSide,
+      radialPt((3 * Math.PI) / 4 + WEDGE_OFFSET - 0.08, 69.0),
+    ],
+    usesTransit: false,
+  });
+
+  const herbFront = radialPt(0 + WEDGE_OFFSET, 66.5);
+  ensureVillager({
+    id: "villager-bagua-herb",
+    name: "白郎中",
+    role: "gardener",
+    hatColor: "#78c26d",
+    shirtColor: "#d9ccb0",
+    homeX: herbFront[0],
+    homeZ: herbFront[1],
+    stops: [
+      herbFront,
+      radialPt(0 + WEDGE_OFFSET + 0.09, 68.5),
+      radialPt(0 + WEDGE_OFFSET - 0.09, 68.5),
+    ],
+    usesTransit: false,
+  });
+
+  const scholarFront = radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET, 66.5);
+  ensureVillager({
+    id: "villager-bagua-scholar",
+    name: "陆夫子",
+    role: "student",
+    hatColor: "#465896",
+    shirtColor: "#33737a",
+    homeX: scholarFront[0],
+    homeZ: scholarFront[1],
+    stops: [
+      scholarFront,
+      radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET + 0.08, 69.2),
+      radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET - 0.08, 69.2),
+    ],
+    usesTransit: false,
+  });
+
+  const smithFront = radialPt(0 + WEDGE_OFFSET, 146.5);
+  ensureVillager({
+    id: "villager-bagua-smith",
+    name: "公孙铁匠",
+    role: "commuter",
+    hatColor: "#d98236",
+    shirtColor: "#434952",
+    homeX: smithFront[0],
+    homeZ: smithFront[1],
+    stops: [
+      smithFront,
+      radialPt(0 + WEDGE_OFFSET + 0.05, 143.5),
+      radialPt(0 + WEDGE_OFFSET - 0.05, 143.5),
+    ],
+    usesTransit: false,
+  });
+
+  const tavernFront = radialPt(Math.PI / 4 + WEDGE_OFFSET, 146.5);
+  ensureVillager({
+    id: "villager-bagua-innkeeper",
+    name: "花月掌柜",
+    role: "artist",
+    hatColor: "#e04f44",
+    shirtColor: "#8a3b61",
+    homeX: tavernFront[0],
+    homeZ: tavernFront[1],
+    stops: [
+      tavernFront,
+      radialPt(Math.PI / 4 + WEDGE_OFFSET + 0.06, 143.0),
+      radialPt(Math.PI / 4 + WEDGE_OFFSET - 0.06, 143.0),
+    ],
+    usesTransit: false,
+  });
+
+  const pagodaFront = radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET, 146.5);
+  ensureVillager({
+    id: "villager-bagua-keeper",
+    name: "守塔陈翁",
+    role: "explorer",
+    hatColor: "#c98cff",
+    shirtColor: "#465878",
+    homeX: pagodaFront[0],
+    homeZ: pagodaFront[1],
+    stops: [
+      pagodaFront,
+      radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET + 0.06, 143.5),
+      radialPt((-3 * Math.PI) / 4 + WEDGE_OFFSET - 0.06, 143.5),
+    ],
+    usesTransit: false,
+  });
+
+  const dyeFront = radialPt(-Math.PI / 2 + WEDGE_OFFSET, 146.5);
+  ensureVillager({
+    id: "villager-bagua-dyer",
+    name: "苏染娘",
+    role: "artist",
+    hatColor: "#38a39c",
+    shirtColor: "#2b5ba8",
+    homeX: dyeFront[0],
+    homeZ: dyeFront[1],
+    stops: [
+      dyeFront,
+      radialPt(-Math.PI / 2 + WEDGE_OFFSET + 0.06, 143.5),
+      radialPt(-Math.PI / 2 + WEDGE_OFFSET - 0.06, 143.5),
+    ],
+    usesTransit: false,
+  });
+
+  const lighthouseFront = radialPt(Math.PI + WEDGE_OFFSET, 146.5);
+  ensureVillager({
+    id: "villager-bagua-lighthouse",
+    name: "戚舵手",
+    role: "commuter",
+    hatColor: "#64f0ff",
+    shirtColor: "#9c3830",
+    homeX: lighthouseFront[0],
+    homeZ: lighthouseFront[1],
+    stops: [
+      lighthouseFront,
+      radialPt(Math.PI + WEDGE_OFFSET + 0.06, 143.5),
+      radialPt(Math.PI + WEDGE_OFFSET - 0.06, 143.5),
+    ],
+    usesTransit: false,
+  });
+
+  const operaFront = radialPt(marketOperaAngle, 140.5);
+  ensureVillager({
+    id: "villager-bagua-opera",
+    name: "魏班主",
+    role: "baker",
+    hatColor: "#ebb93c",
+    shirtColor: "#c9332b",
+    homeX: operaFront[0],
+    homeZ: operaFront[1],
+    stops: [
+      operaFront,
+      radialPt(marketOperaAngle - 0.04, 139.0),
+      radialPt(marketOperaAngle + 0.04, 139.0),
     ],
     usesTransit: false,
   });

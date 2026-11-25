@@ -86,6 +86,19 @@ function clampVillagerToIsland(x, z, minMargin = 2.0) {
   return [cx + dx * lo, cz + dz * lo];
 }
 
+const SPECIALTY_BAGUA_NPC_IDS = new Set([
+  "villager-bagua-daoist",
+  "villager-bagua-tea",
+  "villager-bagua-herb",
+  "villager-bagua-scholar",
+  "villager-bagua-smith",
+  "villager-bagua-innkeeper",
+  "villager-bagua-keeper",
+  "villager-bagua-dyer",
+  "villager-bagua-lighthouse",
+  "villager-bagua-opera",
+]);
+
 export function buildVillagerRig(villager, index = 0) {
   const root = new THREE.Group();
   const s = 0.135; // Fine micro-voxel scale (~1.5m tall villager)
@@ -117,6 +130,19 @@ export function buildVillagerRig(villager, index = 0) {
   headPivot.add(buildVoxelMesh(headVox, { scale: s, depthLayer: 1 }));
   root.add(headPivot);
 
+  // Floating Bagua quest/dialogue gem overhead for Bagua specialty NPCs
+  let questMarker = null;
+  if (SPECIALTY_BAGUA_NPC_IDS.has(villager.id)) {
+    const markerVox = new Vox(901 + index);
+    const gemColor = villager.id === "villager-bagua-daoist" ? "#ffd868" : "#5ef2d6";
+    markerVox.put(0, 0, 0, "#ffe48f", 0.9);
+    markerVox.put(0, 1, 0, gemColor, 1.25);
+    markerVox.put(0, 2, 0, "#ffffff", 1.1);
+    questMarker = buildVoxelMesh(markerVox, { scale: s * 0.62, depthLayer: 4, castShadow: false });
+    questMarker.position.set(0, 14.8 * s, 0);
+    root.add(questMarker);
+  }
+
   // Left & Right Legs (clean hip gap + depthLayer 2; torso & head cast the villager's ground shadow)
   const makeLeg = (seedOff) => {
     const piv = new THREE.Group();
@@ -147,6 +173,11 @@ export function buildVillagerRig(villager, index = 0) {
   rightArm.position.set(-2.08 * s, 8.6 * s, 0);
   root.add(leftArm, rightArm);
 
+  root.userData.villagerId = villager.id;
+  root.traverse((o) => {
+    o.userData.villagerId = villager.id;
+  });
+
   root.userData.dispose = () => {
     root.traverse((o) => {
       if (o.isMesh && o.geometry) o.geometry.dispose();
@@ -160,6 +191,7 @@ export function buildVillagerRig(villager, index = 0) {
     rightLeg,
     leftArm,
     rightArm,
+    questMarker,
   };
 }
 
@@ -193,8 +225,27 @@ export class VillagerAgent {
     this.smoothDirZ = Math.cos(this.yaw);
     this.stuckSec = 0;
     this.initialSanitized = false;
+    this.interactTimer = 0;
+    this.interactTargetX = this.x;
+    this.interactTargetZ = this.z;
+    this.wavePhase = 0;
 
     this.group.position.set(this.x, 0, this.z);
+  }
+
+  triggerInteract(lookAtX, lookAtZ, durationSec = 8.0) {
+    if (this.state === "RIDING") return false;
+    this.interactTimer = Math.max(2.0, durationSec);
+    if (Number.isFinite(lookAtX) && Number.isFinite(lookAtZ)) {
+      this.interactTargetX = lookAtX;
+      this.interactTargetZ = lookAtZ;
+    }
+    this.wavePhase = 0;
+    return true;
+  }
+
+  stopInteract() {
+    this.interactTimer = 0;
   }
 
   sanitizeTarget(rawX, rawZ) {
@@ -278,8 +329,44 @@ export class VillagerAgent {
       }
     }
 
+    if (this.rig.questMarker) {
+      this.rig.questMarker.visible = this.state !== "RIDING";
+      this.rig.questMarker.position.y = 14.8 * 0.135 + Math.sin(t * 2.8 + this.phase) * 0.08;
+      this.rig.questMarker.rotation.y = t * 1.4 + this.phase;
+    }
+
     if (this.scale < 1.0 && this.state !== "BOARDING") {
       this.scale = Math.min(1.0, this.scale + dt * 3.8);
+    }
+
+    if (this.interactTimer > 0 && this.state !== "BOARDING") {
+      this.interactTimer = Math.max(0, this.interactTimer - dt);
+      this.wavePhase += dt;
+      const ldx = this.interactTargetX - this.x;
+      const ldz = this.interactTargetZ - this.z;
+      if (Math.hypot(ldx, ldz) > 0.05) {
+        const targetYaw = Math.atan2(ldx, ldz);
+        let diff = targetYaw - this.yaw;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.yaw += diff * Math.min(1, dt * 8.5);
+        this.smoothDirX = Math.sin(this.yaw);
+        this.smoothDirZ = Math.cos(this.yaw);
+      }
+      this.resolveCollisions(dt, false);
+      const greetWave =
+        this.wavePhase < 2.2
+          ? -2.1 + Math.sin(this.wavePhase * 9.5) * 0.35
+          : Math.sin(t * 2.1 + this.phase) * 0.14;
+      this.rig.leftLeg.rotation.x *= 0.8;
+      this.rig.rightLeg.rotation.x *= 0.8;
+      this.rig.leftArm.rotation.x *= 0.8;
+      this.rig.rightArm.rotation.x += (greetWave - this.rig.rightArm.rotation.x) * Math.min(1, dt * 10);
+      this.rig.headPivot.rotation.y = Math.sin(t * 1.8 + this.phase) * 0.16;
+      this.group.position.set(this.x, 0, this.z);
+      this.group.rotation.y = this.yaw;
+      this.group.scale.setScalar(this.scale);
+      return;
     }
 
     if (this.state === "WALK_TO_STOP") {

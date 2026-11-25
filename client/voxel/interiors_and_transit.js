@@ -346,7 +346,28 @@ export function getBuildingDoorwayTrigger(ent) {
 
 // ─── Interior Theme & Palette Extraction ─────────────────────────────────────
 function classifyInteriorTheme(creation) {
-  if (typeof creation?.id === "string" && creation.id.startsWith("bagua-")) {
+  const cid = typeof creation?.id === "string" ? creation.id : "";
+  if (cid === "bagua-inner-teahouse" || cid === "bagua-outer-forge") {
+    return "cafe_bakery";
+  }
+  if (cid === "bagua-outer-tavern") {
+    return "pub_cantina";
+  }
+  if (
+    cid === "bagua-inner-silkshop" ||
+    cid === "bagua-inner-apothecary" ||
+    cid === "bagua-inner-bookstore" ||
+    cid === "bagua-outer-dyehouse"
+  ) {
+    return "shop_book";
+  }
+  if (cid === "bagua-outer-curio" || cid === "bagua-outer-lighthouse") {
+    return "gallery_dome";
+  }
+  if (cid === "bagua-outer-inn") {
+    return "cottage_manor";
+  }
+  if (cid.startsWith("bagua-")) {
     return "bagua_hall";
   }
   const name = String(creation?.name || creation?.blueprint?.name || "");

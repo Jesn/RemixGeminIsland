@@ -5,8 +5,10 @@ const ALLOWED_STATIC_ORIGINS = new Set([
   "https://aistudio.google.com",
 ]);
 
-const EXACT_CLOUD_RUN_HOST_RE =
-  /^(?:[a-z0-9-]+-853813963450|ais-(?:dev|pre)-[a-z0-9-]+-73428471351)\.[a-z0-9-]+\.run\.app$/;
+const CLOUD_RUN_APPLET_HOST_RE =
+  /^(?:ais-(?:dev|pre)-[a-z0-9-]+-\d+|[a-z0-9-]+-\d+)\.[a-z0-9-]+\.run\.app$/;
+
+const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"]);
 
 const SECRET_PATTERNS: RegExp[] = [
   /AIza[0-9A-Za-z_-]{16,}/g,
@@ -111,21 +113,40 @@ export function safeLogWarn(
   );
 }
 
-export function isAllowedAppletOrigin(origin: string): boolean {
+export function isAllowedAppletOrigin(origin: string, request?: Request): boolean {
   if (!origin || origin === "null") {
     return false;
   }
   if (ALLOWED_STATIC_ORIGINS.has(origin)) return true;
   try {
     const parsed = new URL(origin);
+    const hostname = parsed.hostname.toLowerCase();
+
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      if (LOCAL_DEV_HOSTS.has(hostname)) {
+        return true;
+      }
+      if (request) {
+        try {
+          const reqUrl = new URL(request.url);
+          const secFetchSite = (request.headers.get("sec-fetch-site") || "").toLowerCase();
+          if (parsed.origin === reqUrl.origin && secFetchSite === "same-origin") {
+            return true;
+          }
+        } catch {
+          // ignore malformed request.url fallback
+        }
+      }
+    }
+
     if (parsed.protocol !== "https:") {
       return false;
     }
-    const hostname = parsed.hostname.toLowerCase();
     if (
       hostname === "ai.studio" ||
       hostname.endsWith(".ai.studio") ||
-      EXACT_CLOUD_RUN_HOST_RE.test(hostname)
+      hostname.endsWith(".usercontent.goog") ||
+      CLOUD_RUN_APPLET_HOST_RE.test(hostname)
     ) {
       return true;
     }
@@ -142,7 +163,7 @@ export function isAllowedAppletOrigin(origin: string): boolean {
 export function verifyMutationSecurity(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (origin !== null) {
-    if (!isAllowedAppletOrigin(origin)) {
+    if (!isAllowedAppletOrigin(origin, request)) {
       return "请求来源无效。";
     }
   } else {
@@ -170,7 +191,7 @@ export function verifyMutationSecurity(request: Request): string | null {
 export function verifyWebSocketOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (origin !== null) {
-    if (!isAllowedAppletOrigin(origin)) {
+    if (!isAllowedAppletOrigin(origin, request)) {
       return "不允许的 WebSocket 来源。";
     }
     return null;

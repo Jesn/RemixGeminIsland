@@ -51,10 +51,13 @@ import {
   MAIN_PORTAL_POS,
   PALACE_TRIGRAM_MAP,
   TRIGRAMS,
+  WUXING_GENERATES,
+  WUXING_OF_TRIGRAM,
   createBaguaMysticSystem,
   getBaguaPortalPos,
   resolveTrigramIndexForPoint,
 } from "./bagua_effects.js";
+import { getNpcMeta } from "../npc_dialogues.js";
 
 const CITY_SIGN_POS = [3.8, -10.8];
 const CITY_SIGN_YAW = 0.62;
@@ -1498,6 +1501,8 @@ function buildIslandOceanMaterial(uniforms) {
     uniforms: {
       uTime: uniforms.uTime,
       uFocusXZ: uniforms.uFocusXZ,
+      uHorizonRange: uniforms.uHorizonRange,
+      uOceanMistRange: uniforms.uOceanMistRange,
       uDuskMix: uniforms.uDuskMix,
       uSunDir: { value: new THREE.Vector3(64, 118, 76).normalize() },
     },
@@ -1513,6 +1518,8 @@ function buildIslandOceanMaterial(uniforms) {
     fragmentShader: `
       uniform float uTime;
       uniform vec2 uFocusXZ;
+      uniform vec2 uHorizonRange;
+      uniform vec2 uOceanMistRange;
       uniform float uDuskMix;
       uniform vec3 uSunDir;
       varying vec3 vWorldPos;
@@ -1585,7 +1592,9 @@ function buildIslandOceanMaterial(uniforms) {
 
         // Seamless atmospheric blend into coastal horizon sky mist
         float distFocus = length(wp - uFocusXZ);
-        float horizonMix = smoothstep(240.0, 680.0, distFocus);
+        float mistStart = max(240.0, uOceanMistRange.x);
+        float mistEnd = max(mistStart + 120.0, uOceanMistRange.y);
+        float horizonMix = smoothstep(mistStart, mistEnd, distFocus);
         vec3 seaHorizon = mix(srgb2lin(188.0, 224.0, 245.0), srgb2lin(134.0, 86.0, 112.0), uDuskMix);
         waterCol = mix(waterCol, seaHorizon, horizonMix);
 
@@ -2198,6 +2207,81 @@ function computeRouteBuildingDetour(posX, posZ, rightX, rightZ, baseLane, buildi
   return extraOffset;
 }
 
+function isRacecourseCreationData(creation) {
+  if (!creation) return false;
+  if (creation.id === "c-mwvo0nnd-bb15de") return true;
+  const text = `${creation.name || ""} ${creation.creatorPrompt || ""}`;
+  return /赛马场|跑马场|racecourse|racetrack/i.test(text);
+}
+
+function sampleRoundedRectTrack(arcDist, halfX, halfZ, cornerR) {
+  const r = Math.max(0.2, Math.min(cornerR, halfX * 0.45, halfZ * 0.45));
+  const sx = Math.max(0.4, (halfX - r) * 2);
+  const sz = Math.max(0.4, (halfZ - r) * 2);
+  const arcLen = Math.PI * 0.5 * r;
+  const totalLen = 2 * sx + 2 * sz + 4 * arcLen;
+  let d = ((arcDist % totalLen) + totalLen) % totalLen;
+
+  // Counter-clockwise starting at South-West corner exit heading East (+X) along South straight (z = +halfZ)
+  if (d < sx) {
+    return { x: -(halfX - r) + d, z: halfZ, tx: 1, tz: 0, curvature: 0 };
+  }
+  d -= sx;
+  if (d < arcLen) {
+    const a = d / r;
+    return {
+      x: (halfX - r) + Math.sin(a) * r,
+      z: (halfZ - r) + Math.cos(a) * r,
+      tx: Math.cos(a),
+      tz: -Math.sin(a),
+      curvature: -1 / r,
+    };
+  }
+  d -= arcLen;
+  if (d < sz) {
+    return { x: halfX, z: (halfZ - r) - d, tx: 0, tz: -1, curvature: 0 };
+  }
+  d -= sz;
+  if (d < arcLen) {
+    const a = d / r;
+    return {
+      x: (halfX - r) + Math.cos(a) * r,
+      z: -(halfZ - r) - Math.sin(a) * r,
+      tx: -Math.sin(a),
+      tz: -Math.cos(a),
+      curvature: -1 / r,
+    };
+  }
+  d -= arcLen;
+  if (d < sx) {
+    return { x: (halfX - r) - d, z: -halfZ, tx: -1, tz: 0, curvature: 0 };
+  }
+  d -= sx;
+  if (d < arcLen) {
+    const a = d / r;
+    return {
+      x: -(halfX - r) - Math.sin(a) * r,
+      z: -(halfZ - r) - Math.cos(a) * r,
+      tx: -Math.cos(a),
+      tz: Math.sin(a),
+      curvature: -1 / r,
+    };
+  }
+  d -= arcLen;
+  if (d < sz) {
+    return { x: -halfX, z: -(halfZ - r) + d, tx: 0, tz: 1, curvature: 0 };
+  }
+  d -= sz;
+  const a = Math.min(Math.PI * 0.5, d / r);
+  return {
+    x: -(halfX - r) - Math.cos(a) * r,
+    z: (halfZ - r) + Math.sin(a) * r,
+    tx: Math.sin(a),
+    tz: Math.cos(a),
+    curvature: -1 / r,
+  };
+}
+
 class CreationSimEntity {
   constructor(creation, index = 0, onInteractiveEvent = null, creationsGroup = null) {
     this.id = creation.id;
@@ -2303,6 +2387,9 @@ class CreationSimEntity {
     this.orbitAngle = (index * 1.9) % (Math.PI * 2);
     this.interactive = null;
     this.staticRootFrozen = false;
+    this.isRacecourse = false;
+    this.raceHorses = null;
+    this.raceResources = null;
 
     // Las Vegas Emoji Sphere eye-tracking & playful spin state
     this.eyeGazeX = 0;
@@ -2407,6 +2494,7 @@ class CreationSimEntity {
     const wasStationary = this.data?.behavior?.type === "landmark";
     this.data = creation;
     this.isDualTransit = isDualTransitCreation(creation);
+    this.isRacecourse = isRacecourseCreationData(creation);
     this.isVegasSphere =
       creation.id === "c-mvoo26uh-4e0810" ||
       /vegas.*sphere|emoji.*sphere/i.test(creation.name || "");
@@ -2472,6 +2560,15 @@ class CreationSimEntity {
       creationsGroup.add(this.group);
     } else if (creationsGroup && this.secondaryVehicle && !this.secondaryVehicle.group.parent) {
       creationsGroup.add(this.secondaryVehicle.group);
+    }
+    if (this.isRacecourse) {
+      if (rebuiltGroup || !this.raceHorses) {
+        this.rebuildRacecourseHorses(creation);
+      } else {
+        this.updateRacecoursePlaqueText?.(creation.name || "青草赛马场");
+      }
+    } else if (this.raceHorses) {
+      this.disposeRacecourseHorses();
     }
     const desiredInteractionKind = creation.blueprint?.interaction?.kind || null;
     if (!this.interactive || rebuiltGroup || this.interactive.kind !== desiredInteractionKind) {
@@ -3096,6 +3193,334 @@ class CreationSimEntity {
     });
   }
 
+  disposeRacecourseHorses() {
+    if (this.raceHorses) {
+      for (const h of this.raceHorses) {
+        h.root.parent?.remove(h.root);
+      }
+      this.raceHorses = null;
+    }
+    if (this.racePlaque) {
+      this.racePlaque.group.parent?.remove(this.racePlaque.group);
+      this.racePlaque.boardGeo?.dispose();
+      this.racePlaque.boardMat?.dispose();
+      this.racePlaque.faceGeo?.dispose();
+      this.racePlaque.faceMat?.dispose();
+      this.racePlaque.tex?.dispose();
+      this.racePlaque = null;
+    }
+    if (this.raceResources) {
+      this.raceResources.unitBox.dispose();
+      for (const m of this.raceResources.materials) {
+        m.dispose();
+      }
+      this.raceResources = null;
+    }
+  }
+
+  updateRacecoursePlaqueText(rawTitle) {
+    if (!this.racePlaque) return;
+    const title = (typeof rawTitle === "string" && rawTitle.trim()) || "青草赛马场";
+    if (this.racePlaque.renderedTitle === title) return;
+    this.racePlaque.renderedTitle = title;
+
+    const { canvas, tex } = this.racePlaque;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // Outer walnut-lacquer plaque bevel
+    roundRectPath(ctx, 4, 4, W - 8, H - 8, 18);
+    ctx.fillStyle = "#4d2614";
+    ctx.fill();
+
+    // Inner dark vermilion-espresso face
+    roundRectPath(ctx, 16, 16, W - 32, H - 32, 12);
+    const bgGrad = ctx.createLinearGradient(0, 16, 0, H - 16);
+    bgGrad.addColorStop(0, "#5e1c15");
+    bgGrad.addColorStop(0.5, "#3f110d");
+    bgGrad.addColorStop(1, "#2a0907");
+    ctx.fillStyle = bgGrad;
+    ctx.fill();
+
+    // Gilded inner frame
+    roundRectPath(ctx, 24, 24, W - 48, H - 48, 9);
+    ctx.strokeStyle = "#f2c14e";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Brass corner studs
+    ctx.fillStyle = "#ffd970";
+    for (const [rx, ry] of [
+      [38, 38],
+      [W - 38, 38],
+      [38, H - 38],
+      [W - 38, H - 38],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Subtle flanking golden diamond ornaments
+    ctx.fillStyle = "rgba(255, 217, 112, 0.85)";
+    for (const dx of [66, W - 66]) {
+      ctx.save();
+      ctx.translate(dx, H * 0.5);
+      ctx.rotate(Math.PI * 0.25);
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.restore();
+    }
+
+    // Auto-fit bold golden calligraphy racecourse name
+    let fontSize = 72;
+    const maxTextW = W - 180;
+    const fontFamily =
+      "'STKaiti', 'KaiTi', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    while (fontSize > 34) {
+      ctx.font = `900 ${fontSize}px ${fontFamily}`;
+      if (ctx.measureText(title).width <= maxTextW) break;
+      fontSize -= 4;
+    }
+
+    ctx.shadowColor = "rgba(18, 4, 2, 0.85)";
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 3;
+    const textGrad = ctx.createLinearGradient(0, H * 0.25, 0, H * 0.78);
+    textGrad.addColorStop(0, "#fff2b2");
+    textGrad.addColorStop(0.5, "#ffd257");
+    textGrad.addColorStop(1, "#e29d22");
+    ctx.fillStyle = textGrad;
+    ctx.fillText(title, W * 0.5, H * 0.52);
+
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    tex.needsUpdate = true;
+  }
+
+  rebuildRacecourseHorses(creation) {
+    this.disposeRacecourseHorses();
+    const voxScale = getWorldVoxelSize(creation.scaleClass);
+
+    // Mount double-sided gilded wooden plaque (门匾) on the main entrance gatehouse (z=13..15, y=8.4..10.9)
+    const plaqueW = 8.6 * voxScale;
+    const plaqueH = 2.45 * voxScale;
+    const plaqueD = 2.26 * voxScale;
+    const plaqueGroup = new THREE.Group();
+    plaqueGroup.position.set(0, 9.6 * voxScale, 14.0 * voxScale);
+
+    const boardGeo = new THREE.BoxGeometry(plaqueW, plaqueH, plaqueD);
+    const boardMat = new THREE.MeshStandardMaterial({
+      color: 0x4b2613,
+      roughness: 0.76,
+      metalness: 0.06,
+    });
+    const boardMesh = new THREE.Mesh(boardGeo, boardMat);
+    boardMesh.castShadow = true;
+    boardMesh.receiveShadow = true;
+    plaqueGroup.add(boardMesh);
+
+    const pCanvas = document.createElement("canvas");
+    pCanvas.width = 640;
+    pCanvas.height = 192;
+    const pTex = new THREE.CanvasTexture(pCanvas);
+    pTex.colorSpace = THREE.SRGBColorSpace;
+    pTex.anisotropy = 4;
+
+    const faceGeo = new THREE.PlaneGeometry(plaqueW * 0.965, plaqueH * 0.91);
+    const faceMat = new THREE.MeshStandardMaterial({
+      map: pTex,
+      emissiveMap: pTex,
+      emissive: new THREE.Color(0x6e4a1c),
+      emissiveIntensity: 0.42,
+      roughness: 0.44,
+      metalness: 0.08,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+
+    const frontFace = new THREE.Mesh(faceGeo, faceMat);
+    frontFace.position.z = plaqueD * 0.5 + 0.015;
+    plaqueGroup.add(frontFace);
+
+    const backFace = new THREE.Mesh(faceGeo, faceMat);
+    backFace.position.z = -(plaqueD * 0.5 + 0.015);
+    backFace.rotation.y = Math.PI;
+    plaqueGroup.add(backFace);
+
+    this.group.add(plaqueGroup);
+    this.racePlaque = {
+      group: plaqueGroup,
+      boardGeo,
+      boardMat,
+      faceGeo,
+      faceMat,
+      canvas: pCanvas,
+      tex: pTex,
+      renderedTitle: "",
+    };
+    this.updateRacecoursePlaqueText(creation.name || "青草赛马场");
+
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
+    const materials = [];
+    const makeMat = (hex) => {
+      const mat = new THREE.MeshStandardMaterial({
+        color: hex,
+        roughness: 0.72,
+        metalness: 0.04,
+      });
+      materials.push(mat);
+      return mat;
+    };
+
+    const hoofMat = makeMat(0x231d19);
+    const skinMat = makeMat(0xf0c29c);
+    const saddleWhiteMat = makeMat(0xf8f9fa);
+
+    const horseConfigs = [
+      { coat: 0x8f4519, mane: 0x2c1810, silk: 0xd93829, lane: -0.86, speed: 5.45, startArc: 2.0 },
+      { coat: 0x2a282e, mane: 0x151418, silk: 0xf2be38, lane: -0.43, speed: 5.72, startArc: 7.4 },
+      { coat: 0xeef1f5, mane: 0xc2c8d1, silk: 0x2e6fd9, lane: 0.0, speed: 5.32, startArc: 13.8 },
+      { coat: 0xc98a47, mane: 0x3b2314, silk: 0x2fa866, lane: 0.43, speed: 5.58, startArc: 20.5 },
+      { coat: 0x6b3528, mane: 0x1e1310, silk: 0x8f4fe0, lane: 0.86, speed: 5.22, startArc: 27.2 },
+    ];
+
+    const addPart = (parent, sx, sy, sz, px, py, pz, mat) => {
+      const mesh = new THREE.Mesh(unitBox, mat);
+      mesh.scale.set(sx, sy, sz);
+      mesh.position.set(px, py, pz);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
+
+    const horses = horseConfigs.map((cfg, idx) => {
+      const coatMat = makeMat(cfg.coat);
+      const maneMat = makeMat(cfg.mane);
+      const silkMat = makeMat(cfg.silk);
+
+      const root = new THREE.Group();
+      const bodyGroup = new THREE.Group();
+      root.add(bodyGroup);
+
+      // Torso + chest + saddle + jockey
+      addPart(bodyGroup, 0.36, 0.34, 0.90, 0, 0.62, 0, coatMat);
+      addPart(bodyGroup, 0.38, 0.28, 0.24, 0, 0.64, 0.30, coatMat);
+      addPart(bodyGroup, 0.40, 0.16, 0.36, 0, 0.69, -0.02, silkMat);
+      addPart(bodyGroup, 0.42, 0.08, 0.24, 0, 0.63, -0.02, saddleWhiteMat);
+
+      // Jockey crouched in racing posture
+      const jockeyGroup = new THREE.Group();
+      jockeyGroup.position.set(0, 0.80, 0.02);
+      jockeyGroup.rotation.x = 0.44;
+      addPart(jockeyGroup, 0.22, 0.28, 0.20, 0, 0.14, 0, silkMat);
+      addPart(jockeyGroup, 0.18, 0.16, 0.18, 0, 0.34, 0.03, skinMat);
+      addPart(jockeyGroup, 0.21, 0.11, 0.22, 0, 0.41, 0.04, silkMat);
+      bodyGroup.add(jockeyGroup);
+
+      // Arched neck + head + ears + mane
+      const neckPivot = new THREE.Group();
+      neckPivot.position.set(0, 0.72, 0.36);
+      neckPivot.rotation.x = 0.42;
+      addPart(neckPivot, 0.20, 0.36, 0.22, 0, 0.16, 0.04, coatMat);
+      addPart(neckPivot, 0.08, 0.32, 0.10, 0, 0.18, -0.06, maneMat);
+      addPart(neckPivot, 0.19, 0.18, 0.36, 0, 0.34, 0.16, coatMat);
+      addPart(neckPivot, 0.05, 0.10, 0.06, -0.06, 0.46, 0.07, coatMat);
+      addPart(neckPivot, 0.05, 0.10, 0.06, 0.06, 0.46, 0.07, coatMat);
+      bodyGroup.add(neckPivot);
+
+      // Flowing tail
+      const tailPivot = new THREE.Group();
+      tailPivot.position.set(0, 0.68, -0.45);
+      addPart(tailPivot, 0.10, 0.10, 0.34, 0, -0.04, -0.15, maneMat);
+      bodyGroup.add(tailPivot);
+
+      // 4 articulated legs
+      const makeLeg = (lx, lz) => {
+        const legPivot = new THREE.Group();
+        legPivot.position.set(lx, 0.48, lz);
+        addPart(legPivot, 0.10, 0.40, 0.10, 0, -0.20, 0, coatMat);
+        addPart(legPivot, 0.11, 0.08, 0.12, 0, -0.44, 0.01, hoofMat);
+        bodyGroup.add(legPivot);
+        return legPivot;
+      };
+
+      const legFL = makeLeg(-0.12, 0.32);
+      const legFR = makeLeg(0.12, 0.32);
+      const legBL = makeLeg(-0.12, -0.32);
+      const legBR = makeLeg(0.12, -0.32);
+
+      this.group.add(root);
+
+      return {
+        root,
+        bodyGroup,
+        neckPivot,
+        tailPivot,
+        legFL,
+        legFR,
+        legBL,
+        legBR,
+        laneOffset: cfg.lane,
+        baseSpeed: cfg.speed,
+        arcDist: cfg.startArc,
+        phase: idx * 1.35,
+      };
+    });
+
+    this.raceHorses = horses;
+    this.raceResources = { unitBox, materials, voxScale };
+  }
+
+  stepRacecourseHorses(dt, t) {
+    if (!this.raceHorses || !this.raceResources) return;
+    const voxScale = this.raceResources.voxScale || 0.43;
+    // Match exact sand track centerline (x: -20..20, z: -7.5..7.5 voxels) on top of y=2 voxels
+    const halfX = 20.0 * voxScale;
+    const halfZ = 7.5 * voxScale;
+    const cornerR = 2.6 * voxScale;
+    const trackY = 2.0 * voxScale;
+
+    for (const h of this.raceHorses) {
+      const surge = Math.sin(t * 0.65 + h.phase) * 0.55;
+      const curSpeed = Math.max(3.6, h.baseSpeed + surge);
+      h.arcDist += curSpeed * dt;
+
+      const laneScale = voxScale / 0.43;
+      const pose = sampleRoundedRectTrack(
+        h.arcDist,
+        halfX + h.laneOffset * laneScale,
+        halfZ + h.laneOffset * laneScale,
+        cornerR,
+      );
+
+      const stridePhase = h.arcDist * 3.4 + h.phase;
+      const gallopBounce = Math.abs(Math.sin(stridePhase)) * 0.12;
+      const gallopPitch = Math.sin(stridePhase) * 0.11;
+      const bankRoll = pose.curvature !== 0 ? Math.max(-0.24, Math.min(0.24, -pose.curvature * 0.18)) : 0;
+
+      h.root.position.set(pose.x, trackY + gallopBounce, pose.z);
+      h.root.rotation.set(0, Math.atan2(pose.tx, pose.tz), bankRoll);
+      h.bodyGroup.rotation.x = gallopPitch;
+
+      // Natural asymmetric 4-beat gallop stride
+      h.legFL.rotation.x = Math.sin(stridePhase) * 0.72;
+      h.legFR.rotation.x = Math.sin(stridePhase + 0.55) * 0.72;
+      h.legBL.rotation.x = -Math.sin(stridePhase + 0.25) * 0.70;
+      h.legBR.rotation.x = -Math.sin(stridePhase + 0.80) * 0.70;
+
+      h.neckPivot.rotation.x = 0.42 + Math.sin(stridePhase + 0.6) * 0.16;
+      h.tailPivot.rotation.x = 0.28 + Math.sin(stridePhase * 1.4) * 0.24;
+    }
+  }
+
   updateVegasSphereEyes(dt, t, allEntities) {
     const pivots = this.group.userData?.partPivots;
     const leftEye = pivots?.["pupil-left"];
@@ -3581,6 +4006,7 @@ class CreationSimEntity {
 
     if (
       isStationaryLandmark &&
+      !this.isRacecourse &&
       this.spawnScale >= 1.0 &&
       !this.interactive?.getPoseOffset &&
       !this.staticRootFrozen
@@ -3593,6 +4019,10 @@ class CreationSimEntity {
         }
       }
       this.staticRootFrozen = true;
+    }
+
+    if (this.isRacecourse && this.raceHorses) {
+      this.stepRacecourseHorses(dt, t);
     }
 
     if (this.secondaryVehicle) {
@@ -3866,6 +4296,7 @@ class CreationSimEntity {
       this.secondaryVehicle.group.userData.dispose?.();
       this.secondaryVehicle = null;
     }
+    this.disposeRacecourseHorses();
     this.group.userData.dispose?.();
   }
 }
@@ -4119,6 +4550,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     uDuskMix: { value: 0 },
     uFocusXZ: { value: new THREE.Vector2(0, 0) },
     uHorizonRange: { value: new THREE.Vector2(145, 295) },
+    uOceanMistRange: { value: new THREE.Vector2(240, 680) },
     uZones: { value: Array.from({ length: MAX_SHADER_ZONES }, () => new THREE.Vector4(0, 0, 0, 0)) },
     uZoneCount: { value: 0 },
   };
@@ -4151,6 +4583,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         bloomPass.threshold = 1.1;
       }
       scene.background = daySkyTex;
+      renderer.setClearColor(0xbce0f5, 1);
       return;
     }
     sun.intensity = 2.25 + (0.62 - 2.25) * m;
@@ -4166,6 +4599,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       bloomPass.threshold = 1.15 + (0.86 - 1.15) * m;
     }
     scene.background = m > 0.5 ? duskSkyTex : daySkyTex;
+    renderer.setClearColor(m > 0.5 ? 0x3b2c4e : 0xbce0f5, 1);
   }
 
   function setAtmosphereMode(mode) {
@@ -4248,10 +4682,11 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     typeof document !== "undefined" ? document.getElementById("space-fold-overlay") : null;
   let baguaMystic = null;
 
-  const oceanGeo = new THREE.PlaneGeometry(4600, 4600, 1, 1);
+  const oceanGeo = new THREE.PlaneGeometry(14000, 14000, 1, 1);
   oceanGeo.rotateX(-Math.PI / 2);
   const oceanMesh = new THREE.Mesh(oceanGeo, buildIslandOceanMaterial(grassUniforms));
   oceanMesh.position.set(0, -0.56, 0);
+  oceanMesh.frustumCulled = false;
   oceanMesh.raycast = () => {};
   scene.add(oceanMesh);
 
@@ -5018,6 +5453,269 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     return best;
   }
 
+  let npcAudioCtx = null;
+  function playNpcChime(freq = 523.25) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!npcAudioCtx) npcAudioCtx = new AC();
+      if (npcAudioCtx.state === "suspended") {
+        npcAudioCtx.resume().catch(() => {});
+      }
+      const now = npcAudioCtx.currentTime;
+      const osc = npcAudioCtx.createOscillator();
+      const gain = npcAudioCtx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.25, now + 0.14);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.06, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+      osc.connect(gain);
+      gain.connect(npcAudioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.45);
+    } catch {
+      // Ignore audio errors on headless/restricted contexts
+    }
+  }
+
+  function pickVillagerAt(clientX, clientY) {
+    if (fp.active && interiorSystem?.isInside?.()) return null;
+    rebuildSceneListsIfNeeded();
+    const visibleAgents = [];
+    for (const ag of cachedVillagers) {
+      if (ag && ag.group?.visible && ag.state !== "RIDING") {
+        visibleAgents.push(ag);
+      }
+    }
+    if (visibleAgents.length === 0) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const locked = fp.active && document.pointerLockElement === canvas;
+    const ndcX = locked ? 0 : ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+    const ndcY = locked ? 0 : -((clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+    const activeCam = fp.active ? fpCamera : camera;
+    raycaster.setFromCamera({ x: ndcX, y: ndcY }, activeCam);
+
+    const candidateGroups = [];
+    for (const ag of visibleAgents) {
+      const dx = ag.x - (fp.active ? fp.x : cam.tx);
+      const dz = ag.z - (fp.active ? fp.z : cam.tz);
+      if (fp.active) {
+        if (dx * dx + dz * dz <= 48 * 48) {
+          candidateGroups.push(ag.group);
+        }
+      } else {
+        candidateGroups.push(ag.group);
+      }
+    }
+
+    if (candidateGroups.length > 0) {
+      const prevFar = raycaster.far;
+      raycaster.far = fp.active ? 48 : 650;
+      const hits = raycaster.intersectObjects(candidateGroups, true);
+      raycaster.far = prevFar;
+      for (const hit of hits) {
+        let cur = hit.object;
+        while (cur) {
+          const vid = cur.userData?.villagerId;
+          if (vid && villagerAgents.has(vid)) {
+            return villagerAgents.get(vid);
+          }
+          cur = cur.parent;
+        }
+      }
+    }
+
+    if (!fp.active) {
+      const g = screenToGround(clientX, clientY);
+      if (g) {
+        let best = null;
+        let bestDist = 1.65;
+        for (const ag of visibleAgents) {
+          const d = Math.hypot(ag.x - g[0], ag.z - g[1]);
+          if (d < bestDist) {
+            bestDist = d;
+            best = ag;
+          }
+        }
+        return best;
+      }
+    }
+    return null;
+  }
+
+  function findNearInteractableVillager() {
+    if (!fp.active || interiorSystem?.isInside?.() || interiorSystem?.isRiding?.() || interiorSystem?.isSitting?.()) {
+      return null;
+    }
+    rebuildSceneListsIfNeeded();
+    const fwdX = -Math.sin(fp.yaw);
+    const fwdZ = -Math.cos(fp.yaw);
+    let best = null;
+    let bestScore = Infinity;
+    for (const ag of cachedVillagers) {
+      if (!ag || !ag.group?.visible || ag.state === "RIDING") continue;
+      const dx = ag.x - fp.x;
+      const dz = ag.z - fp.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 3.85) continue;
+      if (dist > 1.85) {
+        const dot = (dx * fwdX + dz * fwdZ) / Math.max(0.01, dist);
+        if (dot < 0.28) continue;
+      }
+      const score = dist;
+      if (score < bestScore) {
+        bestScore = score;
+        best = ag;
+      }
+    }
+    return best;
+  }
+
+  function getNpcInteractionContext() {
+    return {
+      duskMix: ogMode ? 0 : duskMix,
+      telemetry: baguaMystic ? baguaMystic.getTelemetry() : null,
+    };
+  }
+
+  function triggerNpcDialogue(agent) {
+    if (!agent || agent.state === "RIDING") return false;
+    const lookX = fp.active ? fp.x : agent.x + Math.sin(cam.az) * 2.5;
+    const lookZ = fp.active ? fp.z : agent.z + Math.cos(cam.az) * 2.5;
+    agent.triggerInteract?.(lookX, lookZ, 12.0);
+    playNpcChime(493.88);
+    if (fp.active) {
+      releaseWalkPointerLock();
+    }
+    callbacks.onHoverCreation?.(null, 0, 0, null);
+    callbacks.onInteractNpc?.({
+      villager: agent.data,
+      x: agent.x,
+      z: agent.z,
+      context: getNpcInteractionContext(),
+    });
+    return true;
+  }
+
+  function performNpcAction(action) {
+    if (!action || typeof action !== "object") return { ok: false };
+    if (action.kind === "wuxing_hint") {
+      const tel = baguaMystic?.getTelemetry?.();
+      if (!tel) {
+        return { ok: true, message: "登上八卦城太极坛，可观测八门星阵实时灵脉！" };
+      }
+      const unlit = (tel.trigrams || []).filter((t) => !t.palaceLit);
+      if (unlit.length === 0) {
+        baguaMystic?.triggerGrandResonance?.({ playSound: true, fromRemote: false });
+        return { ok: true, message: "八门星阵已然 8/8 全面共鸣！太极脉冲正迎候扶摇大鹏降临！" };
+      }
+      const activeIdx = typeof tel.activeIndex === "number" ? tel.activeIndex : 6;
+      const activeElem = WUXING_OF_TRIGRAM[activeIdx] || "水";
+      const nextElem = WUXING_GENERATES[activeElem] || "木";
+      const synergetic = unlit.find((_, idx) => {
+        const triIndex = tel.trigrams.indexOf(unlit[idx]);
+        return WUXING_OF_TRIGRAM[triIndex] === nextElem;
+      });
+      const chosen = synergetic || unlit[0];
+      const chosenIdx = tel.trigrams.indexOf(chosen);
+      baguaMystic?.triggerAltarPulse?.(chosenIdx >= 0 ? chosenIdx : 0, 1.35, true);
+      playNpcChime(chosen.freq || 440);
+      return {
+        ok: true,
+        message: `依五行「${activeElem}生${nextElem}」之理，建议前往点亮 ${chosen.symbol} ${chosen.name}宫（余 ${unlit.length} 座待启）！`,
+      };
+    }
+    if (action.kind === "bagua_pulse") {
+      const px = fp.active ? fp.x : cam.tx;
+      const pz = fp.active ? fp.z : cam.tz;
+      const triIdx = resolveTrigramIndexForPoint(px - BAGUA_ISLAND_CENTER_X, pz - BAGUA_ISLAND_CENTER_Z);
+      baguaMystic?.triggerAltarPulse?.(triIdx, 1.48, true);
+      const tri = TRIGRAMS[triIdx] || TRIGRAMS[4];
+      const msg = `天机道长挥拂尘共鸣太极坛 · ${tri.symbol} ${tri.name}（${tri.element}）灵波骤起！`;
+      callbacks.onInteractiveEvent?.(null, msg);
+      return { ok: true, message: msg };
+    }
+    if (action.kind === "beacon_signal") {
+      baguaMystic?.triggerAltarPulse?.(4, 1.42, true);
+      playNpcChime(659.25);
+      const msg = "天风望海灯楼青芒亮起！兑泽水光遥映主岛海峡！";
+      callbacks.onInteractiveEvent?.(null, msg);
+      return { ok: true, message: msg };
+    }
+    if (action.kind === "bagua_fortune") {
+      const tel = baguaMystic?.getTelemetry?.();
+      const idx = Math.floor(Math.random() * TRIGRAMS.length);
+      const tri = TRIGRAMS[idx];
+      const fortunes = [
+        "行云流水，宜乘传送阵游历三岛，必有所获。",
+        "木火相生，去流觞丝竹琴台抚琴一曲，神清气朗。",
+        "坤厚载物，盖碗茶香正浓，且停步品茗再启新程。",
+        "星汉灿烂，八门花灯正旺，吉兆自东震而来。",
+        "天行健，扶摇大鹏巡游在望，万象通达。",
+        "坎水润木，青囊药香护持，旅途安宁顺遂。",
+        "山岳沉稳，九宫弈台之上落子自有先机。",
+        "泽气和润，与同游诸君挥手致意，倍添雅兴。",
+      ];
+      const line = `卜得【${tri.symbol} ${tri.name}·${tri.element}】签：${fortunes[idx]}`;
+      if (tel) {
+        baguaMystic?.triggerAltarPulse?.(idx, 1.15, true);
+      }
+      playNpcChime(tri.freq || 440);
+      callbacks.onInteractiveEvent?.(null, line);
+      return { ok: true, message: line };
+    }
+    if (action.kind === "chime_toast") {
+      playNpcChime(action.pitch || 523.25);
+      if (action.message) {
+        callbacks.onInteractiveEvent?.(null, action.message);
+      }
+      return { ok: true, message: action.message || "雅兴满满！" };
+    }
+    if (action.kind === "enter_landmark" && action.landmarkId) {
+      const entered = enterBuildingById(action.landmarkId);
+      if (entered) {
+        return { ok: true, closeDialogue: true, message: "已步入室内，按 E 可随时推门而出" };
+      }
+      const ent = creationEntities.get(action.landmarkId);
+      if (ent) {
+        if (!fp.active) focusOn(ent.x, ent.z, 1.75);
+        return { ok: true, closeDialogue: true, message: `已指引前往「${ent.data.name}」` };
+      }
+      return { ok: false, message: "附近建筑暂不可进入" };
+    }
+    if (action.kind === "focus_landmark") {
+      if (action.landmarkId === "__main_portal__") {
+        if (fp.active) {
+          playNpcChime(523.25);
+          return { ok: true, message: "主岛传送阵位于中央广场东北侧，走近按 E 即可跃迁！" };
+        }
+        focusOn(MAIN_PORTAL_POS[0], MAIN_PORTAL_POS[1], 1.75);
+        return { ok: true, closeDialogue: true, message: "已聚焦至主岛空间传送阵" };
+      }
+      const ent = action.landmarkId ? creationEntities.get(action.landmarkId) : null;
+      if (ent) {
+        if (fp.active) {
+          playNpcChime(440);
+          return { ok: true, message: `向前方望去，「${ent.data.name}」就在不远处！` };
+        }
+        focusOn(ent.x, ent.z, 1.65);
+        return { ok: true, closeDialogue: true, message: `已为您定位「${ent.data.name}」` };
+      }
+      return { ok: false };
+    }
+    if (action.kind === "wave") {
+      triggerLocalWave();
+      playNpcChime(587.33);
+      const msg = `你向${action.villagerName ? ` ${action.villagerName} ` : "居民"}热情挥手致意！`;
+      callbacks.onInteractiveEvent?.(null, msg);
+      return { ok: true, message: msg };
+    }
+    return { ok: false };
+  }
+
   function updateBiomeShaderUniforms(zones) {
     const list = Array.isArray(zones) ? zones.slice(0, MAX_SHADER_ZONES) : [];
     let count = 0;
@@ -5757,8 +6455,6 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     if (ogMode) {
       frameActiveWorldForOg();
       ogSettledFrames = 0;
-    } else if (world.myCreationId && !highlightedId) {
-      highlightedId = world.myCreationId;
     }
   }
 
@@ -5807,10 +6503,66 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
   let fpTouchLook = null;
   let suppressPointerUnlockExit = false;
   let lastUnlockedFpMouse = null;
+  let autoNavTarget = null;
+
+  function stopAutoNavigate(reason = "cancelled") {
+    if (!autoNavTarget) return false;
+    const prev = autoNavTarget;
+    autoNavTarget = null;
+    callbacks.onAutoNavigateChange?.({ active: false, reason, target: prev });
+    return true;
+  }
+
+  function startAutoNavigate(target) {
+    if (!target || !Number.isFinite(Number(target.x)) || !Number.isFinite(Number(target.z))) {
+      return false;
+    }
+    if (!fp.active) {
+      setDragMode("walk");
+    }
+    if (interiorSystem?.isInside?.()) {
+      exitCurrentBuilding();
+    }
+    if (interiorSystem?.isRiding?.()) {
+      hopOffCurrentVehicle();
+    }
+    if (interiorSystem?.isSitting?.()) {
+      const wake = interiorSystem.standUp();
+      if (wake?.ok && wake.pose && !wake.pose.isInterior) {
+        fp.x = wake.pose.x;
+        fp.z = wake.pose.z;
+      }
+    }
+    const tx = Number(target.x);
+    const tz = Number(target.z);
+    const islandKey = target.islandKey || getIslandKeyAt(tx, tz);
+    if (getIslandKeyAt(fp.x, fp.z) !== islandKey) {
+      return false;
+    }
+    autoNavTarget = {
+      x: tx,
+      z: tz,
+      label: target.label || "目的地",
+      islandKey,
+      creationId: target.creationId || null,
+      arrivalRadius: Number.isFinite(Number(target.arrivalRadius)) ? Number(target.arrivalRadius) : 3.2,
+      avoidSide: 1,
+      stuckSec: 0,
+      flippedOnce: false,
+    };
+    callbacks.onAutoNavigateChange?.({ active: true, reason: "started", target: autoNavTarget });
+    return true;
+  }
 
   function requestWalkPointerLock() {
     if (!fp.active || ogMode) return;
-    if (typeof document !== "undefined" && document.querySelector("dialog[open]")) return;
+    if (
+      typeof document !== "undefined" &&
+      (document.querySelector("dialog[open]") ||
+        document.body?.dataset?.npcOpen === "1" ||
+        document.body?.dataset?.mapExpanded === "1")
+    )
+      return;
     if (typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches) return;
     if (document.pointerLockElement === canvas) return;
     try {
@@ -6545,6 +7297,19 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         pitch: fp.pitch,
       });
     }
+    if (!target && fp.active && !inside && !interiorSystem.isRiding() && !interiorSystem.isSitting()) {
+      const nearNpc = findNearInteractableVillager();
+      if (nearNpc) {
+        target = {
+          kind: "talk_npc",
+          id: nearNpc.id,
+          agent: nearNpc,
+          villager: nearNpc.data,
+          label: `对话 ${nearNpc.data.name}`,
+          keyHint: "E",
+        };
+      }
+    }
     if (!target && fp.active && !inside && !interiorSystem.isRiding() && !interiorSystem.isSitting() && baguaMystic) {
       const nearPalace = baguaMystic.getNearPalace(fp.x, fp.z, 6.2);
       if (nearPalace) {
@@ -6603,6 +7368,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
   function enterBuildingById(id) {
     if (!id) return false;
+    stopAutoNavigate("entering");
     const ent = ensureCreationBuilt(id);
     if (ent?.data && !canEnterCreation(ent.data)) return false;
 
@@ -6708,6 +7474,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
   function boardVehicleById(rideId, preferredSeat = 0) {
     if (!rideId) return false;
+    stopAutoNavigate("boarding");
     const baseId = String(rideId).replace(/#(?:sec|tram)$/, "");
     ensureCreationBuilt(baseId);
     cancelIntroSweep("walk");
@@ -6890,6 +7657,12 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       }
       refreshInteractionTarget();
       return Boolean(res?.ok);
+    }
+
+    if (target.kind === "talk_npc" && target.agent) {
+      const ok = triggerNpcDialogue(target.agent);
+      refreshInteractionTarget();
+      return ok;
     }
 
     const res = target.execute?.();
@@ -7116,6 +7889,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       dragMode = "walk";
       enterFirstPerson();
     } else {
+      stopAutoNavigate("mode_exit");
       if (fp.active) {
         exitFirstPerson(false);
       }
@@ -7326,6 +8100,8 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     if (
       fp.active &&
       !document.querySelector("dialog[open]") &&
+      document.body?.dataset?.npcOpen !== "1" &&
+      document.body?.dataset?.mapExpanded !== "1" &&
       document.visibilityState === "visible" &&
       document.hasFocus()
     ) {
@@ -7394,7 +8170,12 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         return;
       }
 
-      if (e.button === 0 && document.pointerLockElement !== canvas) {
+      if (
+        e.button === 0 &&
+        document.pointerLockElement !== canvas &&
+        document.body?.dataset?.npcOpen !== "1" &&
+        document.body?.dataset?.mapExpanded !== "1"
+      ) {
         requestWalkPointerLock();
       }
       pointerGesture = {
@@ -7611,6 +8392,22 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       hoveredInteractiveEnt.interactive?.setHovered?.(null);
       hoveredInteractiveEnt = null;
     }
+    const npcHit = pickVillagerAt(x, y);
+    if (npcHit) {
+      const meta = getNpcMeta(npcHit.data);
+      callbacks.onHoverCreation?.(
+        {
+          id: npcHit.id,
+          name: npcHit.data.name,
+          description: `${meta.title} · 点击或靠近按 E 对话`,
+        },
+        x,
+        y,
+        { summary: meta.badge },
+      );
+      canvas.style.cursor = "pointer";
+      return;
+    }
     const hovered = pickCreationAt(x, y);
     const reading = hovered && hovered.id !== "__city_sign__" ? liveFeedsById[hovered.id] || null : null;
     callbacks.onHoverCreation?.(hovered ? hovered.data : null, x, y, reading);
@@ -7627,6 +8424,11 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       } else {
         callbacks.onSelectCreation?.(iHit.ent.data, liveFeedsById[iHit.ent.id] || null);
       }
+      return;
+    }
+    const npcHit = pickVillagerAt(clientX, clientY);
+    if (npcHit) {
+      triggerNpcDialogue(npcHit);
       return;
     }
     const picked = pickCreationAt(clientX, clientY);
@@ -7758,6 +8560,17 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
           } else {
             callbacks.onSelectCreation?.(iHit.ent.data, liveFeedsById[iHit.ent.id] || null);
           }
+          return;
+        }
+        const npcHit = pickVillagerAt(e.clientX, e.clientY);
+        if (npcHit) {
+          if (
+            Math.hypot(cam.goalTx - npcHit.x, cam.goalTz - npcHit.z) > 18 ||
+            cam.goalZoom < 1.35
+          ) {
+            focusOn(npcHit.x, npcHit.z, Math.max(1.65, cam.goalZoom));
+          }
+          triggerNpcDialogue(npcHit);
           return;
         }
       }
@@ -8181,6 +8994,10 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       if (isKeyDown("KeyA", "a")) inRight -= 1;
       sprint = isKeyDown("ShiftLeft", "ShiftRight", "shift");
 
+      if (autoNavTarget && Math.hypot(inFwd, inRight) > 0.08) {
+        stopAutoNavigate("manual");
+      }
+
       if (interiorSystem.isSitting()) {
         const wake = interiorSystem.handleMovementWake(
           Math.hypot(inFwd, inRight),
@@ -8289,6 +9106,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         oceanMesh.position.set(rPose.x, -0.56, rPose.z);
         grassUniforms.uFocusXZ.value.set(rPose.x, rPose.z);
         grassUniforms.uHorizonRange.value.set(96, 238);
+        grassUniforms.uOceanMistRange.value.set(240, 680);
         updateTexelSnappedSun(
           rPose.x - Math.sin(fp.yaw) * 18,
           rPose.z - Math.cos(fp.yaw) * 18,
@@ -8473,6 +9291,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         oceanMesh.position.set(fp.x, -0.56, fp.z);
         grassUniforms.uFocusXZ.value.set(fp.x, fp.z);
         grassUniforms.uHorizonRange.value.set(96, 238);
+        grassUniforms.uOceanMistRange.value.set(240, 680);
         updateTexelSnappedSun(
           fp.x - Math.sin(fp.yaw) * 18,
           fp.z - Math.cos(fp.yaw) * 18,
@@ -8508,6 +9327,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
         let wishVx = 0;
         let wishVz = 0;
+        let isAutoWalking = false;
         const inMag = Math.hypot(inFwd, inRight);
         if (inMag > 0.02) {
           const scale = Math.min(1, inMag) / inMag;
@@ -8515,6 +9335,85 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
           const nr = inRight * scale;
           wishVx = (fwdX * nf + rightX * nr) * maxSpeed;
           wishVz = (fwdZ * nf + rightZ * nr) * maxSpeed;
+        } else if (autoNavTarget) {
+          if (getIslandKeyAt(fp.x, fp.z) !== autoNavTarget.islandKey) {
+            stopAutoNavigate("island_changed");
+          } else {
+            const ndx = autoNavTarget.x - fp.x;
+            const ndz = autoNavTarget.z - fp.z;
+            const ndist = Math.hypot(ndx, ndz);
+            let arrivedAtTarget = ndist <= Math.max(2.6, Math.min(18, autoNavTarget.arrivalRadius || 3.2));
+            if (!arrivedAtTarget && autoNavTarget.creationId) {
+              const targetEnt = creationEntities.get(autoNavTarget.creationId);
+              if (targetEnt && (targetEnt.data?.category === "building" || targetEnt.data?.behavior?.type === "landmark")) {
+                const box = getBuildingTightBox(targetEnt, 0.8);
+                if (
+                  pushPointOutOfVehicleOBB(
+                    fp.x,
+                    fp.z,
+                    1.6,
+                    targetEnt.x,
+                    targetEnt.z,
+                    targetEnt.yaw || 0,
+                    box.halfX,
+                    box.halfZ,
+                  )
+                ) {
+                  arrivedAtTarget = true;
+                }
+              }
+            }
+
+            if (arrivedAtTarget) {
+              fp.vx = 0;
+              fp.vz = 0;
+              stopAutoNavigate("arrived");
+            } else {
+              isAutoWalking = true;
+              const baseAng = Math.atan2(ndz, ndx);
+              const s = autoNavTarget.avoidSide >= 0 ? 1 : -1;
+              const probeOffsets = [0, 0.42 * s, -0.42 * s, 0.86 * s, -0.86 * s, 1.32 * s, -1.32 * s, 1.76 * s, -1.76 * s];
+              let bestAng = baseAng;
+              let bestScore = -Infinity;
+              for (let oi = 0; oi < probeOffsets.length; oi++) {
+                const off = probeOffsets[oi];
+                const candAng = baseAng + off;
+                const ux = Math.cos(candAng);
+                const uz = Math.sin(candAng);
+                const probeDist = Math.min(2.2, Math.max(1.1, ndist * 0.7));
+                const [px, pz] = resolveWalkPosition(fp.x + ux * probeDist, fp.z + uz * probeDist, fp.feetY);
+                const movedX = px - fp.x;
+                const movedZ = pz - fp.z;
+                const movedLen = Math.hypot(movedX, movedZ);
+                const pushDelta = Math.hypot(px - (fp.x + ux * probeDist), pz - (fp.z + uz * probeDist));
+                if (oi === 0 && pushDelta < 0.12 && movedLen > probeDist * 0.75) {
+                  bestAng = candAng;
+                  break;
+                }
+                const goalGain = (movedX * ndx + movedZ * ndz) / Math.max(0.001, ndist);
+                const blockedPenalty = movedLen < probeDist * 0.3 ? 6.0 : 0;
+                const score = goalGain - pushDelta * 1.45 - Math.abs(off) * 0.16 - blockedPenalty;
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestAng = candAng;
+                }
+              }
+
+              const navSpeed = sprint ? 9.6 : ndist < 4.5 ? 4.8 : 7.0;
+              wishVx = Math.cos(bestAng) * navSpeed;
+              wishVz = Math.sin(bestAng) * navSpeed;
+
+              if (
+                document.pointerLockElement !== canvas &&
+                !pointerGesture &&
+                !fpTouchLook &&
+                !isKeyDown("ArrowLeft", "arrowleft", "ArrowRight", "arrowright")
+              ) {
+                const travelYaw = Math.atan2(-wishVx, -wishVz);
+                fp.goalYaw += wrapPi(travelYaw - fp.goalYaw) * Math.min(1, dt * 4.2);
+              }
+            }
+          }
         }
 
         const velDamp = 1 - Math.exp(-dt * 14);
@@ -8526,6 +9425,23 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         const [rx, rz] = resolveWalkPosition(fp.x + fp.vx * dt, fp.z + fp.vz * dt, fp.feetY);
         fp.x = rx;
         fp.z = rz;
+
+        if (isAutoWalking && autoNavTarget) {
+          const stepDist = Math.hypot(fp.x - prevX, fp.z - prevZ);
+          if (stepDist < 0.55 * dt) {
+            autoNavTarget.stuckSec += dt;
+            if (autoNavTarget.stuckSec > 1.4 && !autoNavTarget.flippedOnce) {
+              autoNavTarget.avoidSide *= -1;
+              autoNavTarget.flippedOnce = true;
+            } else if (autoNavTarget.stuckSec > 3.8) {
+              fp.vx = 0;
+              fp.vz = 0;
+              stopAutoNavigate("blocked");
+            }
+          } else {
+            autoNavTarget.stuckSec = Math.max(0, autoNavTarget.stuckSec - dt * 1.5);
+          }
+        }
 
         if (fp.jumpY > 0 || fp.jumpVy > 0) {
           fp.jumpY += fp.jumpVy * dt;
@@ -8572,6 +9488,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         oceanMesh.position.set(fp.x, -0.56, fp.z);
         grassUniforms.uFocusXZ.value.set(fp.x, fp.z);
         grassUniforms.uHorizonRange.value.set(96, 238);
+        grassUniforms.uOceanMistRange.value.set(240, 680);
         updateTexelSnappedSun(fp.x + fwdX * 18, fp.z + fwdZ * 18);
         reportFpCameraChange(fp.x, fp.z);
 
@@ -8757,6 +9674,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
               145 + (96 - 145) * e,
               295 + (238 - 295) * e,
             );
+            grassUniforms.uOceanMistRange.value.set(240, 680);
             const sunGoalX = introSweep.walkX - Math.sin(wYaw) * 18;
             const sunGoalZ = introSweep.walkZ - Math.cos(wYaw) * 18;
             updateTexelSnappedSun(
@@ -8809,6 +9727,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
             oceanMesh.position.set(fp.x, -0.56, fp.z);
             grassUniforms.uFocusXZ.value.set(fp.x, fp.z);
             grassUniforms.uHorizonRange.value.set(96, 238);
+            grassUniforms.uOceanMistRange.value.set(240, 680);
             updateTexelSnappedSun(
               fp.x - Math.sin(fp.yaw) * 18,
               fp.z - Math.cos(fp.yaw) * 18,
@@ -8841,17 +9760,35 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
       if (!handledByFpSwoop) {
         skyDome.visible = false;
-        const camDist = 240;
-        const horiz = Math.cos(cam.el) * camDist;
+        const foldZoomMul = baguaMystic ? baguaMystic.getFoldState().zoomMultiplier : 1;
+        const effZoom = Math.max(0.08, cam.zoom * foldZoomMul);
+        const halfH = BASE_FRUSTUM / effZoom;
+        const rawSinEl = Math.sin(cam.el);
+        const sinEl = Math.max(0.12, rawSinEl);
+        const cosEl = Math.cos(cam.el);
+        // Adapt orthographic distance and far plane to (zoom, el) so the ocean plane
+        // and terrain across the entire viewport never get near-plane or far-plane clipped
+        // when rotating to low elevation angles or zooming out.
+        const neededFront = Math.max(0, (135 - cam.ty + halfH * cosEl) / sinEl) + 48;
+        const neededBack = Math.max(0, (cam.ty + 6 + halfH * cosEl) / sinEl) + 260;
+        const camDist = Math.max(360, 12 + neededFront);
+        const targetFar = Math.max(1400, Math.ceil((camDist + neededBack) / 50) * 50);
+        if (camera.near !== 12 || Math.abs(camera.far - targetFar) > 25) {
+          camera.near = 12;
+          camera.far = targetFar;
+        }
+        const horiz = cosEl * camDist;
         camera.position.set(
           cam.tx + Math.sin(cam.az) * horiz,
-          cam.ty + Math.sin(cam.el) * camDist,
+          cam.ty + rawSinEl * camDist,
           cam.tz + Math.cos(cam.az) * horiz,
         );
         camera.lookAt(cam.tx, cam.ty, cam.tz);
-        const foldZoomMul = baguaMystic ? baguaMystic.getFoldState().zoomMultiplier : 1;
         camera.zoom = cam.zoom * foldZoomMul;
         camera.updateProjectionMatrix();
+        if (renderPass && renderPass.camera !== camera) {
+          syncComposerCamera(camera);
+        }
 
         const azDeltaFromHome = wrapPi(cam.az - HOME_AZ);
         const isHome =
@@ -8894,6 +9831,10 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
           (72 + (145 - 72) * lowHorizonSmooth) * zoomHorizonScale,
           (142 + (295 - 142) * lowHorizonSmooth) * zoomHorizonScale,
         );
+        const oceanSpanDist = halfH / sinEl;
+        const oceanMistStart = Math.max(260, oceanSpanDist * 1.18);
+        const oceanMistEnd = Math.max(680, oceanMistStart * 2.4);
+        grassUniforms.uOceanMistRange.value.set(oceanMistStart, oceanMistEnd);
         updateTexelSnappedSun(cam.tx, cam.tz);
       }
 
@@ -8935,7 +9876,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
     if (!ogMode && !interiorSystem.isInside() && highlightedId && creationEntities.has(highlightedId)) {
       const myEnt = creationEntities.get(highlightedId);
-      if (myEnt.y <= 2.5) {
+      if (myEnt.y <= 2.5 && !myEnt.isRacecourse) {
         selectionHalo.visible = true;
         selectionHalo.position.set(myEnt.x, 0.122, myEnt.z);
         const haloBase = Math.max(1.8, (myEnt.footprintRadius || 2.8) + 0.6);
@@ -9060,6 +10001,144 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         onBaguaIsland: getIslandKeyAt(vx, vz) === "bagua" && !interiorSystem.isInside(),
       };
     },
+    getWalkMinimapData: () => {
+      const visible = Boolean(fp.active && !ogMode);
+      if (!visible) return { visible: false };
+      const islandKey = getIslandKeyAt(fp.x, fp.z);
+      let regionLabel = "中心区";
+      if (islandKey === "bagua") {
+        const dx = fp.x - BAGUA_ISLAND_CENTER_X;
+        const dz = fp.z - BAGUA_ISLAND_CENTER_Z;
+        if (Math.hypot(dx, dz) < 28) {
+          regionLabel = "太极坛中心";
+        } else {
+          const tri = TRIGRAMS[resolveTrigramIndexForPoint(dx, dz)] || TRIGRAMS[4];
+          regionLabel = `${tri.symbol} ${tri.name}位 · ${tri.element}`;
+        }
+      } else if (islandKey === "kunlun") {
+        const dK = Math.hypot(fp.x - KUNLUN_ISLAND_CENTER_X, fp.z - KUNLUN_ISLAND_CENTER_Z);
+        regionLabel = dK < 32 ? "玄霜宫阙" : "蓬莱环崖";
+      } else {
+        if (Math.hypot(fp.x, fp.z) < 24) {
+          regionLabel = "中心广场";
+        } else if (fp.x < -30) {
+          regionLabel = "西区赛场";
+        } else if (fp.x > 30) {
+          regionLabel = "东区渡口";
+        } else if (fp.z < -22) {
+          regionLabel = "北岸车站";
+        } else {
+          regionLabel = "南岸草坪";
+        }
+      }
+
+      const [baguaWestX, baguaWestZ] = getBaguaPortalPos(BAGUA_ISLAND_CENTER_X, BAGUA_ISLAND_CENTER_Z);
+      const rawPortals = Array.isArray(baguaMystic?.portals) && baguaMystic.portals.length > 0
+        ? baguaMystic.portals
+        : [
+            { id: "main_to_bagua", island: "main", x: MAIN_PORTAL_POS[0], z: MAIN_PORTAL_POS[1], label: "八卦城传送阵" },
+            { id: "bagua_to_main", island: "bagua", x: baguaWestX, z: baguaWestZ, label: "主岛传送阵" },
+            { id: "bagua_to_kunlun", island: "bagua", x: BAGUA_ISLAND_CENTER_X, z: BAGUA_ISLAND_CENTER_Z - 27.2, label: "蓬莱传送阵" },
+            { id: "kunlun_to_main", island: "kunlun", x: KUNLUN_PORTAL_POS[0], z: KUNLUN_PORTAL_POS[1], label: "返回主岛阵" },
+          ];
+      const portals = rawPortals
+        .filter((p) => p.island === islandKey)
+        .map((p) => ({ id: p.id, x: p.x, z: p.z, label: p.label || "传送阵" }));
+
+      const terrainZones = (currentWorld?.terrainZones || [])
+        .filter((z) => getIslandKeyAt(z.x, z.z) === islandKey)
+        .map((z) => ({ biome: z.biome, x: z.x, z: z.z, radius: z.radius }));
+
+      const paths = (currentWorld?.paths || [])
+        .filter((p) => Array.isArray(p.points) && p.points.some(([px, pz]) => getIslandKeyAt(px, pz) === islandKey))
+        .map((p) => ({ kind: p.kind, points: p.points, closed: Boolean(p.closed) }));
+
+      const creations = [];
+      const vehicles = [];
+      for (const ent of creationEntities.values()) {
+        const c = ent.data;
+        if (!c) continue;
+        const bType = c.behavior?.type;
+        if (bType === "vehicle_route") {
+          if (getIslandKeyAt(ent.x, ent.z) === islandKey) {
+            vehicles.push({ id: ent.id, x: ent.x, z: ent.z, name: c.name });
+          }
+          if (ent.secondaryVehicle && getIslandKeyAt(ent.secondaryVehicle.x, ent.secondaryVehicle.z) === islandKey) {
+            vehicles.push({
+              id: `${ent.id}#sec`,
+              x: ent.secondaryVehicle.x,
+              z: ent.secondaryVehicle.z,
+              name: c.name,
+            });
+          }
+          continue;
+        }
+        if (bType === "flight_loop" || bType === "island_flight" || bType === "creature_wander") {
+          continue;
+        }
+        if (getIslandKeyAt(ent.x, ent.z) !== islandKey) continue;
+        const voxSize = getWorldVoxelSize(c.scaleClass);
+        const spanX = Math.max(2.6, (Number(c.blueprint?.stats?.footprintX) || 14) * voxSize);
+        const spanZ = Math.max(2.6, (Number(c.blueprint?.stats?.footprintZ) || 14) * voxSize);
+        creations.push({
+          id: c.id,
+          name: c.name,
+          category: c.category,
+          scaleClass: c.scaleClass,
+          x: ent.x,
+          z: ent.z,
+          yaw: ent.yaw || 0,
+          worldSpanX: spanX,
+          worldSpanZ: spanZ,
+          isRacecourse: Boolean(ent.isRacecourse),
+        });
+      }
+
+      const npcs = [];
+      for (const ag of villagerAgents.values()) {
+        if (getIslandKeyAt(ag.x, ag.z) !== islandKey) continue;
+        npcs.push({
+          id: ag.id,
+          x: ag.x,
+          z: ag.z,
+          specialist: typeof ag.id === "string" && ag.id.startsWith("villager-bagua-"),
+        });
+      }
+
+      const peers = [];
+      for (const peer of remotePlayers.peers.values()) {
+        if (peer.room) continue;
+        if (getIslandKeyAt(peer.curX, peer.curZ) !== islandKey) continue;
+        peers.push({
+          id: peer.id,
+          name: peer.name,
+          x: peer.curX,
+          z: peer.curZ,
+        });
+      }
+
+      return {
+        visible: true,
+        islandKey,
+        regionLabel,
+        inside: Boolean(interiorSystem?.isInside?.()),
+        riding: Boolean(interiorSystem?.isRiding?.()),
+        autoNavigating: Boolean(autoNavTarget),
+        staticVersion: `${currentWorld?.version ?? 0}:${creationEntities.size}:${paths.length}:${terrainZones.length}`,
+        player: {
+          x: fp.x,
+          z: fp.z,
+          yaw: fp.yaw,
+        },
+        portals,
+        terrainZones,
+        paths,
+        creations,
+        vehicles,
+        npcs,
+        remotePlayers: peers,
+      };
+    },
     projectWorldToScreen: (wx = BAGUA_ISLAND_CENTER_X, wy = 15, wz = BAGUA_ISLAND_CENTER_Z) => {
       const activeCam = fp.active ? fpCamera : camera;
       const v = new THREE.Vector3(wx, wy, wz);
@@ -9075,7 +10154,19 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         visible: inFront && v.z >= -1 && v.z <= 1.2,
       };
     },
+    requestWalkPointerLock,
     releaseWalkPointerLock,
+    startAutoNavigate,
+    stopAutoNavigate,
+    performNpcAction,
+    getNpcPosition: (villagerId) => {
+      const ag = villagerId ? villagerAgents.get(villagerId) : null;
+      return ag ? { x: ag.x, z: ag.z } : null;
+    },
+    stopNpcInteract: (villagerId) => {
+      const ag = villagerId ? villagerAgents.get(villagerId) : null;
+      ag?.stopInteract?.();
+    },
     setLocalAppearance,
     getLocalAppearance,
     triggerLocalWave,

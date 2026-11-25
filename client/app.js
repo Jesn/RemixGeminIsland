@@ -2,6 +2,8 @@ import { createMeadowWorldEngine } from "./voxel/meadow_engine.js";
 import { createCharacterBuilderController } from "./character_builder.js";
 import { createMultiplayerClient } from "./multiplayer_client.js";
 import { createBaguaD3Hud } from "./bagua_d3_hud.js";
+import { buildNpcDialogueSession } from "./npc_dialogues.js";
+import { createWalkMinimapController } from "./walk_minimap.js";
 
 const urlParams = new URLSearchParams(location.search);
 const isOgCapture = urlParams.get("og") === "1";
@@ -34,8 +36,6 @@ const buildingPillLabel = document.getElementById("building-pill-label");
 const buildingPillSub = document.getElementById("building-pill-sub");
 const readyGotoBtn = document.getElementById("ready-goto-btn");
 const readyGotoLabel = document.getElementById("ready-goto-label");
-const locateMineBtn = document.getElementById("locate-mine-btn");
-const locateMineLabel = document.getElementById("locate-mine-label");
 
 const hoverCard = document.getElementById("hover-card");
 const hoverName = document.getElementById("hover-name");
@@ -53,6 +53,7 @@ const camPanoramaBtn = document.getElementById("cam-panorama-btn");
 const atmosphereBtn = document.getElementById("atmosphere-btn");
 const atmosphereLabel = document.getElementById("atmosphere-label");
 const baguaEnergyHudEl = document.getElementById("bagua-energy-hud");
+const walkMinimapEl = document.getElementById("walk-minimap");
 const recenterBtn = document.getElementById("recenter-btn");
 const recenterCompass = document.getElementById("recenter-compass");
 const avatarBtn = document.getElementById("avatar-btn");
@@ -62,6 +63,14 @@ const onlineCountEl = document.getElementById("online-count");
 const interactPromptBtn = document.getElementById("interact-prompt");
 const interactKeyEl = document.getElementById("interact-key");
 const interactLabelEl = document.getElementById("interact-label");
+const npcDialogueCard = document.getElementById("npc-dialogue-card");
+const npcBadgeEl = document.getElementById("npc-badge");
+const npcNameEl = document.getElementById("npc-name");
+const npcTitleEl = document.getElementById("npc-title");
+const npcLineEl = document.getElementById("npc-line");
+const npcNextBtn = document.getElementById("npc-next-btn");
+const npcCloseBtn = document.getElementById("npc-close-btn");
+const npcActionsEl = document.getElementById("npc-actions");
 const walkEscHintBtn = document.getElementById("walk-esc-hint");
 const avatarDialog = document.getElementById("avatar-dialog");
 
@@ -172,11 +181,89 @@ function stopJobTracking() {
 let engine = null;
 let characterBuilder = null;
 let mpClient = null;
+let walkMinimap = null;
 let activeInteractionPrompt = null;
+let activeNpcSession = null;
+let npcLineIndex = 0;
 let lastAvatarDialogCloseMs = -1000;
 let currentCamMode = "pan";
 let sawTouchInput = false;
 let joyPointerId = null;
+
+function renderNpcDialogueLine(customMessage = null) {
+  if (!activeNpcSession || !npcLineEl) return;
+  if (customMessage) {
+    npcLineEl.textContent = customMessage;
+    return;
+  }
+  const lines = activeNpcSession.lines || [];
+  npcLineEl.textContent = lines[npcLineIndex % Math.max(1, lines.length)] || "";
+}
+
+function closeNpcDialogue() {
+  if (!activeNpcSession && npcDialogueCard?.hidden !== false) return;
+  const prevId = activeNpcSession?.villagerId;
+  activeNpcSession = null;
+  npcLineIndex = 0;
+  delete document.body.dataset.npcOpen;
+  if (npcDialogueCard) npcDialogueCard.hidden = true;
+  if (prevId) engine?.stopNpcInteract?.(prevId);
+}
+
+function triggerNpcSessionAction(idx) {
+  if (!activeNpcSession) return;
+  const action = activeNpcSession.actions?.[idx];
+  if (!action) return;
+  const res = engine?.performNpcAction?.(action);
+  if (res?.message) {
+    renderNpcDialogueLine(res.message);
+  }
+  if (res?.closeDialogue) {
+    closeNpcDialogue();
+    if (res.message) showToast(res.message, 3600);
+  }
+}
+
+function openNpcDialogue(payload) {
+  if (!payload?.villager || !npcDialogueCard || isOgCapture) return;
+  walkMinimap?.setExpanded?.(false);
+  const session = buildNpcDialogueSession(payload.villager, payload.context);
+  activeNpcSession = session;
+  npcLineIndex = 0;
+  document.body.dataset.npcOpen = "1";
+  hoverCard.hidden = true;
+  if (npcBadgeEl) {
+    npcBadgeEl.textContent = session.badge || "居民";
+    npcBadgeEl.classList.toggle("is-specialist", Boolean(session.isBaguaSpecialist));
+  }
+  if (npcNameEl) npcNameEl.textContent = session.name;
+  if (npcTitleEl) npcTitleEl.textContent = session.title;
+  renderNpcDialogueLine();
+  if (npcNextBtn) {
+    npcNextBtn.hidden = (session.lines?.length || 0) <= 1;
+  }
+  if (npcActionsEl) {
+    npcActionsEl.replaceChildren();
+    (session.actions || []).forEach((act, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "npc-action-btn";
+      const kbd = document.createElement("kbd");
+      kbd.className = "npc-action-key";
+      kbd.textContent = String(idx + 1);
+      const span = document.createElement("span");
+      span.textContent = act.label;
+      btn.append(kbd, span);
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        triggerNpcSessionAction(idx);
+        btn.blur();
+      });
+      npcActionsEl.appendChild(btn);
+    });
+  }
+  npcDialogueCard.hidden = false;
+}
 
 function syncAvatarSwatchDot(app) {
   if (!avatarSwatchDot || !app || typeof app !== "object") return;
@@ -282,6 +369,10 @@ function syncCameraModeUI(mode) {
     camPanoramaBtn.setAttribute("aria-pressed", isPanorama ? "true" : "false");
   }
   syncWalkJoystickVisibility();
+  if (!isWalk) {
+    walkMinimap?.setExpanded?.(false);
+    walkMinimap?.update?.(performance.now(), { visible: false });
+  }
   if (walkEscHintBtn) {
     walkEscHintBtn.hidden = isOgCapture || !isWalk || isMobileWalkViewport();
   }
@@ -427,6 +518,7 @@ engine = createMeadowWorldEngine(
       mpClient?.sendEmote(kind);
     },
     onInteriorChange(roomInfo) {
+      closeNpcDialogue();
       if (roomInfo) {
         document.body.dataset.inInterior = "1";
         if (uiState === "picking" || uiState === "composing") {
@@ -453,6 +545,18 @@ engine = createMeadowWorldEngine(
     onLocalBaguaTeleport(portalId) {
       mpClient?.sendBaguaTeleport?.(portalId);
     },
+    onInteractNpc(payload) {
+      openNpcDialogue(payload);
+    },
+    onAutoNavigateChange(ev) {
+      if (!ev || isOgCapture) return;
+      if (ev.reason === "arrived") {
+        walkMinimap?.clearWaypoint?.();
+        showToast(`已抵达「${ev.target?.label || "目的地"}」`, 2600);
+      } else if (ev.reason === "blocked") {
+        showToast("前方道路受阻，已暂停自动导航", 2600);
+      }
+    },
   },
   { ogMode: isOgCapture },
 );
@@ -464,6 +568,20 @@ interactPromptBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
   engine?.triggerActiveInteraction?.();
   interactPromptBtn.blur();
+});
+
+npcNextBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!activeNpcSession) return;
+  npcLineIndex = (npcLineIndex + 1) % Math.max(1, activeNpcSession.lines.length);
+  renderNpcDialogueLine();
+  npcNextBtn.blur();
+});
+
+npcCloseBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  closeNpcDialogue();
+  npcCloseBtn.blur();
 });
 
 characterBuilder = createCharacterBuilderController({
@@ -494,6 +612,8 @@ syncAvatarSwatchDot(engine?.getLocalAppearance?.() || characterBuilder?.getAppea
 
 avatarBtn?.addEventListener("click", () => {
   if (isOgCapture) return;
+  closeNpcDialogue();
+  walkMinimap?.setExpanded?.(false);
   avatarBtn?.blur();
   hoverCard.hidden = true;
   resetWalkJoystick();
@@ -686,11 +806,6 @@ function syncDockUI() {
   bottomBuilder.hidden = true;
   buildingPill.hidden = true;
   readyGotoBtn.hidden = true;
-  locateMineBtn.hidden = true;
-
-  if (myCreationId && uiState !== "ready") {
-    uiState = "placed";
-  }
 
   switch (uiState) {
     case "picking":
@@ -722,13 +837,6 @@ function syncDockUI() {
       readyGotoBtn.hidden = false;
       const name = readyCreation?.name || "你的作品";
       readyGotoLabel.textContent = `已就绪 · 前往查看 ${name}`;
-      engine.setSpotPickerState({ mode: "hidden" });
-      break;
-    }
-    case "placed": {
-      locateMineBtn.hidden = false;
-      const mine = worldData?.creations?.find((c) => c.id === myCreationId);
-      locateMineLabel.textContent = mine ? `定位 · ${mine.name}` : "定位我的作品";
       engine.setSpotPickerState({ mode: "hidden" });
       break;
     }
@@ -773,12 +881,6 @@ async function pollActiveJob() {
     if (job.status === "failed") {
       stopJobTracking();
       sculptBtn.disabled = false;
-      if (job.creationId) {
-        myCreationId = job.creationId;
-        uiState = "placed";
-        syncDockUI();
-        return;
-      }
       uiState = "composing";
       syncDockUI();
       showFormError(job.error || "暂时无法完成建造，请稍后重试。");
@@ -817,11 +919,6 @@ addBtn.addEventListener("click", () => {
   if (engine.isFirstPerson()) {
     engine.setDragMode("pan");
   }
-  if (myCreationId) {
-    uiState = "placed";
-    syncDockUI();
-    return;
-  }
   hoverCard.hidden = true;
   engine.setPreviewPrompt(promptInput.value);
   uiState = "picking";
@@ -847,6 +944,23 @@ closeBuilderBtn.addEventListener("click", () => {
 });
 
 window.addEventListener("keydown", (e) => {
+  if (activeNpcSession) {
+    if (e.key === "1") {
+      e.preventDefault();
+      triggerNpcSessionAction(0);
+      return;
+    }
+    if (e.key === "2") {
+      e.preventDefault();
+      triggerNpcSessionAction(1);
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeNpcDialogue();
+      return;
+    }
+  }
   if (e.key === "Escape") {
     if (
       characterBuilder?.isOpen?.() ||
@@ -854,6 +968,11 @@ window.addEventListener("keydown", (e) => {
         (avatarDialog.open || (e.target instanceof Node && avatarDialog.contains(e.target)))) ||
       performance.now() - lastAvatarDialogCloseMs < 80
     ) {
+      return;
+    }
+    if (walkMinimap?.isExpanded?.()) {
+      e.preventDefault();
+      walkMinimap.setExpanded(false);
       return;
     }
     if (uiState === "picking" || uiState === "composing") {
@@ -867,6 +986,35 @@ window.addEventListener("keydown", (e) => {
       hoverCard.hidden = true;
       engine.setDragMode("pan");
     }
+  } else if (
+    (e.key === "m" || e.key === "M") &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    !isOgCapture &&
+    engine?.isFirstPerson?.() &&
+    walkMinimap
+  ) {
+    const t = e.target;
+    const isTyping =
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement ||
+      Boolean(t?.isContentEditable);
+    if (
+      !isTyping &&
+      !characterBuilder?.isOpen?.() &&
+      !(avatarDialog && avatarDialog.open)
+    ) {
+      e.preventDefault();
+      walkMinimap.toggleExpanded();
+    }
+  }
+});
+
+worldCanvas.addEventListener("pointerdown", () => {
+  if (walkMinimap?.isExpanded?.()) {
+    walkMinimap.setExpanded(false);
   }
 });
 
@@ -877,24 +1025,13 @@ worldCanvas.addEventListener("pointerleave", () => {
 readyGotoBtn.addEventListener("click", () => {
   if (!myCreationId) return;
   hoverCard.hidden = true;
-  uiState = "placed";
+  uiState = "idle";
   syncDockUI();
   engine.focusCreationById(myCreationId);
   const mine = worldData?.creations?.find((c) => c.id === myCreationId) || readyCreation;
   if (mine) {
     const desc = mine.description || mine.behavior?.statusLine || "";
     showToast(desc ? `${mine.name} — ${desc}` : mine.name, 4600);
-  }
-});
-
-locateMineBtn.addEventListener("click", () => {
-  if (!myCreationId) return;
-  hoverCard.hidden = true;
-  engine.focusCreationById(myCreationId);
-  const mine = worldData?.creations?.find((c) => c.id === myCreationId);
-  if (mine) {
-    const desc = mine.description || mine.behavior?.statusLine || "";
-    showToast(desc ? `${mine.name} — ${desc}` : mine.name);
   }
 });
 
@@ -1020,8 +1157,10 @@ sculptBtn.addEventListener("click", async () => {
   }
   syncDockUI();
 
+  let res;
+  let data = null;
   try {
-    const res = await fetch("/api/build", {
+    res = await fetch("/api/build", {
       method: "POST",
       headers: buildVisitorHeaders({
         "content-type": "application/json",
@@ -1034,43 +1173,59 @@ sculptBtn.addEventListener("click", async () => {
         z: spotZ,
       }),
     });
-    const data = await res.json();
-    if (data?.visitorToken) storeVisitorToken(data.visitorToken);
-
-    if (!res.ok || !data.ok) {
-      sculptBtn.disabled = false;
-      if (data.alreadyPlaced && data.myCreationId) {
-        myCreationId = data.myCreationId;
-        uiState = "placed";
-        syncDockUI();
-        return;
+    const rawText = await res.text();
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = null;
       }
-      uiState = "composing";
-      syncDockUI();
-      showFormError(data.error || "暂时无法完成建造，请稍后重试。");
-      return;
     }
-
-    if (data.job) {
-      startTrackingJob(data.job);
-      return;
-    }
-
-    // Direct synchronous fallback if ever returned
-    sculptBtn.disabled = false;
-    worldData = data.world;
-    myCreationId = data.creation.id;
-    readyCreation = data.creation;
-    if (data.feeds) engine.applyLiveFeeds(data.feeds);
-    engine.applyWorldSnapshot(worldData);
-    uiState = "ready";
-    syncDockUI();
-  } catch {
+  } catch (err) {
+    console.error("Build request failed:", err);
     sculptBtn.disabled = false;
     uiState = "composing";
     syncDockUI();
     showFormError("建造时网络开小差了，请再试一次。");
+    return;
   }
+
+  if (data?.visitorToken) storeVisitorToken(data.visitorToken);
+
+  if (!res.ok || !data?.ok) {
+    sculptBtn.disabled = false;
+    uiState = "composing";
+    syncDockUI();
+    let fallbackMsg = "暂时无法完成建造，请稍后重试。";
+    if (!data) {
+      if (res.status === 413) {
+        fallbackMsg = "图片或描述内容过大，请换一张小一点的图片再试。";
+      } else if (res.status === 403) {
+        fallbackMsg = "请求校验未通过，请刷新页面后再试。";
+      } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+        fallbackMsg = "建造服务暂时繁忙，请稍后再试。";
+      } else {
+        fallbackMsg = `暂时无法完成建造（${res.status}），请稍后重试。`;
+      }
+    }
+    showFormError(data?.error || fallbackMsg);
+    return;
+  }
+
+  if (data.job) {
+    startTrackingJob(data.job);
+    return;
+  }
+
+  // Direct synchronous fallback if ever returned
+  sculptBtn.disabled = false;
+  worldData = data.world;
+  myCreationId = data.creation.id;
+  readyCreation = data.creation;
+  if (data.feeds) engine.applyLiveFeeds(data.feeds);
+  engine.applyWorldSnapshot(worldData);
+  uiState = "ready";
+  syncDockUI();
 });
 
 promptInput.addEventListener("keydown", (e) => {
@@ -1105,11 +1260,8 @@ async function refreshDailyEligibility() {
     worldData = latest;
     myCreationId = latest.myCreationId || null;
     engine.applyWorldSnapshot(worldData);
-    if (latest.myActiveJob && !myCreationId) {
+    if (latest.myActiveJob && uiState === "idle") {
       startTrackingJob(latest.myActiveJob);
-    } else if (!myCreationId && uiState === "placed") {
-      uiState = "idle";
-      syncDockUI();
     }
   } catch {
     // ignore transient network errors
@@ -1160,7 +1312,7 @@ function handleWorldMessage(msg) {
     engine.applyWorldSnapshot(worldData);
     if (uiState === "building" && activeJob) {
       pollActiveJob();
-    } else if (uiState === "placed" || uiState === "ready") {
+    } else if (uiState === "ready") {
       syncDockUI();
     }
     refreshLiveFeeds();
@@ -1235,10 +1387,7 @@ async function initWorld() {
       myCreationId = worldData.myCreationId || myCreationId || null;
       engine.applyWorldSnapshot(worldData);
       if (!isOgCapture) {
-        if (myCreationId) {
-          uiState = "placed";
-          syncDockUI();
-        } else if (worldData.myActiveJob) {
+        if (worldData.myActiveJob) {
           startTrackingJob(worldData.myActiveJob);
         } else {
           uiState = "idle";
@@ -1259,18 +1408,60 @@ async function initWorld() {
 
 initWorld();
 
-if (!isOgCapture && baguaEnergyHudEl) {
-  const baguaD3Hud = createBaguaD3Hud(baguaEnergyHudEl);
+if (!isOgCapture && (baguaEnergyHudEl || walkMinimapEl)) {
+  const baguaD3Hud = baguaEnergyHudEl ? createBaguaD3Hud(baguaEnergyHudEl) : null;
+  walkMinimap = walkMinimapEl
+    ? createWalkMinimapController(walkMinimapEl, {
+        onExpandChange(expanded) {
+          if (expanded) {
+            document.body.dataset.mapExpanded = "1";
+            hoverCard.hidden = true;
+            engine?.releaseWalkPointerLock?.();
+          } else {
+            delete document.body.dataset.mapExpanded;
+          }
+        },
+        onWaypointChange(wp) {
+          if (!wp) {
+            engine?.stopAutoNavigate?.("cleared");
+          } else {
+            engine?.stopAutoNavigate?.("waypoint_changed");
+          }
+        },
+        onAutoNavigateToggle(wp, enable) {
+          if (enable && wp) {
+            const ok = engine?.startAutoNavigate?.(wp);
+            if (ok) {
+              showToast(`已开启自动前往「${wp.label || "目的地"}」（WASD 可随时接管）`, 2600);
+            }
+          } else {
+            engine?.stopAutoNavigate?.("cancelled");
+          }
+        },
+      })
+    : null;
   let lastHudTick = 0;
-  const tickBaguaHud = (now) => {
-    requestAnimationFrame(tickBaguaHud);
+  const tickWalkHuds = (now) => {
+    requestAnimationFrame(tickWalkHuds);
     if (document.visibilityState === "hidden") return;
-    if (now - lastHudTick < 48) return;
+    if (now - lastHudTick < 45) return;
     lastHudTick = now;
-    const telemetry = engine?.getBaguaTelemetry?.();
-    const visible = Boolean(telemetry?.onBaguaIsland && !isOgCapture);
-    const avoidTopLeftHint = Boolean(walkEscHintBtn && !walkEscHintBtn.hidden);
-    baguaD3Hud.update(now, { visible, telemetry, avoidTopLeftHint });
+    if (activeNpcSession && engine?.isFirstPerson?.()) {
+      const pos = engine.getNpcPosition?.(activeNpcSession.villagerId);
+      const camState = engine.getCameraState?.();
+      if (!pos || !camState || Math.hypot(pos.x - camState.fpX, pos.z - camState.fpZ) > 7.5) {
+        closeNpcDialogue();
+      }
+    }
+    if (baguaD3Hud) {
+      const telemetry = engine?.getBaguaTelemetry?.();
+      const visible = Boolean(telemetry?.onBaguaIsland && !isOgCapture);
+      const avoidTopLeftHint = Boolean(walkEscHintBtn && !walkEscHintBtn.hidden);
+      baguaD3Hud.update(now, { visible, telemetry, avoidTopLeftHint });
+    }
+    if (walkMinimap) {
+      walkMinimap.update(now, engine?.getWalkMinimapData?.());
+    }
   };
-  requestAnimationFrame(tickBaguaHud);
+  requestAnimationFrame(tickWalkHuds);
 }

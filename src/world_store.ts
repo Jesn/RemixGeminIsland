@@ -81,6 +81,7 @@ import {
 import { applyCuratedDistrictRelocations } from "./curated_district_relocations";
 import { BAGUA_PROTECTED_PATH_IDS, ensureBaguaIsland } from "./bagua_island";
 import { ensureKunlunIsland, KUNLUN_PROTECTED_PATH_IDS } from "./kunlun_island";
+import { upgradeRacecourseCreationInPlace } from "./racecourse_upgrade";
 import { buildCompanionVehicleBlueprint } from "./world_landmarks_v16";
 
 const MAX_CONCURRENT_SCULPTS = 3;
@@ -413,6 +414,13 @@ export class WorldStore {
       villagers: this.villagers,
     }).changed;
 
+    let racecourseChanged = false;
+    for (const c of this.creations) {
+      if (upgradeRacecourseCreationInPlace(c)) {
+        racecourseChanged = true;
+      }
+    }
+
     // Enforce island content & brand/political neutrality policy on loaded world state
     const policyFiltered = filterWorldCollectionsByPolicy({
       creations: this.creations,
@@ -459,7 +467,7 @@ export class WorldStore {
       bgTimer.unref?.();
     }
 
-    if (curatedChanged || baguaChanged || kunlunChanged) {
+    if (curatedChanged || baguaChanged || kunlunChanged || racecourseChanged) {
       this.version += 1;
       this.schedulePersist();
     }
@@ -1082,17 +1090,6 @@ export class WorldStore {
       this.jobs = this.jobs.filter(
         (j) => j.status === "queued" || j.status === "sculpting" || j.createdAt >= cutoff,
       );
-    }
-
-    const existingTodayId = this.lookupTodayCreation(input.cookieId, input.dayKey);
-    if (existingTodayId) {
-      return {
-        ok: false,
-        status: 403,
-        alreadyPlaced: true,
-        myCreationId: existingTodayId,
-        error: "你今天已经在岛上添加过作品了，明天再来创作新作品吧！",
-      };
     }
 
     if (input.prompt) {
@@ -1824,16 +1821,6 @@ export class WorldStore {
   }
 
   public async placeCreation(input: PlaceCreationInput): Promise<PlaceCreationResult> {
-    const existingId = this.lookupTodayCreation(input.cookieId, input.dayKey);
-    if (existingId) {
-      return {
-        ok: false,
-        alreadyPlaced: true,
-        myCreationId: existingId,
-        error: "你今天已经在岛上添加过作品了，明天再来创作新作品吧！",
-      };
-    }
-
     const cleanPrompt = sanitizePlainText(input.creatorPrompt, 240, true);
     const bp = normalizeAndGroundBlueprint(input.blueprintRaw, "草坪作品", {
       contextText: cleanPrompt,
@@ -1912,6 +1899,7 @@ export class WorldStore {
       createdAt: now,
     };
 
+    upgradeRacecourseCreationInPlace(creation);
     this.creations.push(creation);
     if (input.cookieId) {
       const dayKey = input.dayKey || formatDayKeyInTz(now, "Australia/Sydney");

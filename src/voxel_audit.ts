@@ -1464,7 +1464,15 @@ export function alignLandmarksToFrontage(
 
   for (const c of creations) {
     if (c.isSeed || c.isCompanion) continue;
-    if (c.id.startsWith("bagua-gate-") || c.id.startsWith("kunlun-")) continue;
+    if (
+      c.id.startsWith("bagua-gate-") ||
+      c.id.startsWith("bagua-inner-") ||
+      c.id.startsWith("bagua-outer-") ||
+      c.id.startsWith("bagua-market-") ||
+      c.id.startsWith("bagua-courtyard-") ||
+      c.id.startsWith("bagua-shore-") ||
+      c.id.startsWith("kunlun-")
+    ) continue;
     if (c.category !== "building" && c.behavior?.type !== "landmark") continue;
 
     const desiredYaw = computeIntelligentBuildingYaw(c, paths);
@@ -2441,6 +2449,11 @@ export function auditAndRepairWorldSpatial(
     if (
       b.id === "bagua-taiji-pavilion" ||
       b.id.startsWith("bagua-gate-") ||
+      b.id.startsWith("bagua-inner-") ||
+      b.id.startsWith("bagua-outer-") ||
+      b.id.startsWith("bagua-market-") ||
+      b.id.startsWith("bagua-courtyard-") ||
+      b.id.startsWith("bagua-shore-") ||
       landmarkConnectedByAccepted(b) ||
       accepted.length === 0
     ) {

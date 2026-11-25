@@ -199,6 +199,9 @@
     <!-- Floating Bagua Directional Energy D3 Visualization HUD -->
     <aside id="bagua-energy-hud" class="bagua-energy-hud" aria-label="八卦灵脉能量监测" hidden></aside>
 
+    <!-- Floating Walk-Mode Current-Island Minimap -->
+    <aside id="walk-minimap" class="walk-minimap" aria-label="漫步小地图" hidden></aside>
+
     <!-- Transient world note -->
     <div id="weave-toast" class="weave-toast" role="status" aria-live="polite" hidden></div>
 
@@ -227,6 +230,25 @@
     <button type="button" id="interact-prompt" class="interact-prompt" hidden>
       <kbd id="interact-key" class="interact-key">E</kbd><span id="interact-label">进入</span>
     </button>
+
+    <!-- Interactive NPC Dialogue Card -->
+    <aside id="npc-dialogue-card" class="npc-dialogue-card" role="dialog" aria-label="人物对话" hidden>
+      <div class="npc-dialogue-header">
+        <div class="npc-speaker-meta">
+          <span id="npc-badge" class="npc-badge">八卦城</span>
+          <div class="npc-speaker-names">
+            <span id="npc-name" class="npc-name">天机道长</span>
+            <span id="npc-title" class="npc-title">太极坛司阵道长</span>
+          </div>
+        </div>
+        <div class="npc-header-btns">
+          <button type="button" id="npc-next-btn" class="npc-next-btn" title="切换下一句对话">换一句</button>
+          <button type="button" id="npc-close-btn" class="npc-close-btn" aria-label="关闭对话">&times;</button>
+        </div>
+      </div>
+      <p id="npc-line" class="npc-line"></p>
+      <div id="npc-actions" class="npc-actions"></div>
+    </aside>
 
     <!-- Bottom-Anchored Explore & Build Dock (never blocks the 3D meadow) -->
     <div class="bottom-dock">
@@ -302,12 +324,6 @@
       <button type="button" id="ready-goto-btn" class="dock-pill dock-pill-ready" hidden>
         <span class="live-dot live-dot-pulse" aria-hidden="true"></span>
         <span id="ready-goto-label">已就绪 · 前往查看</span>
-      </button>
-
-      <!-- 6. Locate existing creation -->
-      <button type="button" id="locate-mine-btn" class="dock-pill dock-pill-placed" hidden>
-        <span class="live-dot" aria-hidden="true"></span>
-        <span id="locate-mine-label">定位我的作品</span>
       </button>
     </div>
 

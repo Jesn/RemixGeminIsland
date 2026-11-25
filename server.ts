@@ -514,9 +514,21 @@ export async function startServer(customPort?: number) {
 
     if (urlPath.startsWith("/api/")) {
       const env = resolveRuntimeEnv();
-      const webReq = toWebRequest(req);
-      const webRes = await handleApiRequest(webReq, env);
-      await sendWebResponse(res, webRes);
+      try {
+        const webReq = toWebRequest(req);
+        const webRes = await handleApiRequest(webReq, env);
+        await sendWebResponse(res, webRes);
+      } catch (err) {
+        safeLogError("api_transport", err, [env.GEMINI_API_KEY, env.CREATOR_HMAC_SECRET]);
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.setHeader("content-type", "application/json; charset=utf-8");
+          res.setHeader("cache-control", "no-store");
+          res.end(JSON.stringify({ ok: false, error: "服务器内部错误。" }));
+        } else {
+          res.end();
+        }
+      }
       return;
     }
 
